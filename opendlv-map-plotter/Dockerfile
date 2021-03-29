@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Part to build opendlv-kitti-replay.
+# Part to build opendlv-map-plotter.
 FROM ubuntu:18.04 as builder
 MAINTAINER Liangyu Wang "liangyu@student.chalmers.se"
 RUN apt-get update -y && \
@@ -21,7 +21,19 @@ RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     cmake \
     build-essential \
-    software-properties-common
+    software-properties-common \
+    apt-utils
+
+RUN apt-get update
+RUN apt-get install -y libpython2.7-dev \
+    g++ \
+    make \
+    python2.7 \
+    python-dev \
+    python-numpy \
+    python-pip
+
+RUN pip install matplotlib
 
 RUN add-apt-repository -y ppa:chrberger/libcluon
 RUN apt-get update
@@ -34,12 +46,20 @@ RUN mkdir build && \
     cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=/tmp/dest .. && \
     make && make install
 
-# Part to deploy opendlv-kitti-replay
+# Part to deploy opendlv-map-plotter
 FROM ubuntu:18.04
 MAINTAINER Liangyu Wang "liangyu@student.chalmers.se"
 ENV DEBIAN_FRONTEND=noninteractive
 
+RUN apt-get update
+RUN apt-get install -y libpython2.7-dev \
+    python-matplotlib \
+    python-numpy \
+    python-pip
+
+RUN pip install matplotlib
+
 WORKDIR /usr/bin
 COPY --from=builder /tmp/dest /usr
-ENTRYPOINT ["/usr/bin/opendlv-kitti-replay"]
+ENTRYPOINT ["/usr/bin/opendlv-map-plotter"]
 

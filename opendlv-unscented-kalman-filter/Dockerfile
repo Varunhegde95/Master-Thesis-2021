@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Part to build opendlv-kitti-replay.
+# Part to build opendlv-unscented-kalman-filter.
 FROM ubuntu:18.04 as builder
 MAINTAINER Liangyu Wang "liangyu@student.chalmers.se"
 RUN apt-get update -y && \
@@ -22,6 +22,9 @@ RUN apt-get update -y && \
     cmake \
     build-essential \
     software-properties-common
+
+RUN apt-get update
+RUN apt-get install -y libeigen3-dev
 
 RUN add-apt-repository -y ppa:chrberger/libcluon
 RUN apt-get update
@@ -34,12 +37,12 @@ RUN mkdir build && \
     cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=/tmp/dest .. && \
     make && make install
 
-# Part to deploy opendlv-kitti-replay
+# Part to deploy opendlv-unscented-kalman-filter.
 FROM ubuntu:18.04
 MAINTAINER Liangyu Wang "liangyu@student.chalmers.se"
 ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /usr/bin
 COPY --from=builder /tmp/dest /usr
-ENTRYPOINT ["/usr/bin/opendlv-kitti-replay"]
+ENTRYPOINT ["/usr/bin/opendlv-unscented-kalman-filter"]
 
