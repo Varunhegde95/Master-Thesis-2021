@@ -80,6 +80,7 @@ int32_t main(int32_t argc, char **argv) {
                 opendlv::proxy::GeodeticWgs84Reading gps;
                 gps.latitude(oxts_reading.lat);            
                 gps.longitude(oxts_reading.lon);
+                gps.altitude(oxts_reading.alt);
 
                 opendlv::sensor::Acceleration acceleration;
                 acceleration.ax(oxts_reading.ax);

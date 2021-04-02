@@ -115,6 +115,7 @@ message opendlv.proxy.GeodeticHeadingReading [id = 1051] {
 message opendlv.proxy.GeodeticWgs84Reading [id = 19] {
   double latitude [id = 1];
   double longitude [id = 3];
+  double altitude [id = 2]; /////////////////////////////
 }
 
 message opendlv.proxy.ImageReading [id = 1055] {
