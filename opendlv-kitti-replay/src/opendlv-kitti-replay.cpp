@@ -17,11 +17,99 @@
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
 
-#include <iostream>
-#include <cstdint>
-#include <cstring>
+#include "kitti-replay.hpp"
 
 int32_t main(int32_t argc, char **argv) {
-    
-    return 0;
+    int32_t retCode{1};
+    const std::string PROGRAM{argv[0]};
+    auto commandlineArguments = cluon::getCommandlineArguments(argc, argv);
+    if ((0 == commandlineArguments.count("cid")) ||
+        (0 == commandlineArguments.count("freq")) ) {
+        std::cerr << "         --cid:     CID of the OD4Session to replay other Envelopes" << std::endl;
+        std::cerr << "         --freq:    Frequency to send out the KITTI data [IMU, GPS, Lidar]" << std::endl;
+        std::cerr << "         --name:    name of the shared memory area to create" << std::endl;
+        std::cerr << "         --verbose: print decoding information and display image" << std::endl;
+        std::cerr << "         --id-sender: sender id of output messages" << std::endl;
+        std::cerr << "Example: " << argv[0] << " --cid=111 --name=data --verbose" << std::endl;
+    }
+    else {
+        const std::string NAME{commandlineArguments["name"]};
+        float const FREQ{std::stof(commandlineArguments["freq"])}; // Frequency
+        const bool VERBOSE{commandlineArguments.count("verbose") != 0};
+        uint32_t const IDSENDER{(commandlineArguments["id-sender"].size() != 0)               
+            ? static_cast<uint32_t>(std::stoi(commandlineArguments["id-sender"])) : 0};
+
+        // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
+        cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
+
+        //std::unique_ptr<cluon::SharedMemory> sharedMemory(nullptr);
+
+        std::string kittiPath;
+        for (auto e : commandlineArguments) {
+            if (e.second.empty() && e.first != PROGRAM) {
+                kittiPath = e.first;
+                break;
+            }
+        }
+        
+        if(kittiPath.empty())
+            std::cerr << argv[0] << ": Failed to open '" << kittiPath << "'" << std::endl;
+        else{
+            std::string oxtsPath  = kittiPath + "oxts/data/";
+            std::string lidarPath = kittiPath + "velodyne_points/data/";
+            std::vector<std::string> files_oxts;
+            std::vector<std::string> files_lidar;
+            int16_t fileNum;
+            std::tie(files_oxts, fileNum) = loadFile(oxtsPath, VERBOSE);
+            std::tie(files_lidar, fileNum) = loadFile(lidarPath, VERBOSE);
+
+            std::vector<Oxts_Data> oxts_data;
+            auto timer_oxts = std::chrono::system_clock::now();
+            for (int16_t i = 0; i < fileNum; i ++){
+                auto oxts_read = loadOxts(files_oxts, i);
+                oxts_data.push_back(oxts_read);
+            }
+            timerCalculator(timer_oxts, "Loading all KITTI oxts data");
+
+            int16_t NUM = 0;
+
+            auto atFrequency{[&VERBOSE, &od4, &oxts_data, &IDSENDER, &NUM]() -> bool{
+                cluon::data::TimeStamp sampleTime{cluon::time::now()};
+                auto oxts_reading = oxts_data[NUM];
+
+                opendlv::proxy::GeodeticWgs84Reading gps;
+                gps.latitude(oxts_reading.lat);            
+                gps.longitude(oxts_reading.lon);
+
+                opendlv::sensor::Acceleration acceleration;
+                acceleration.ax(oxts_reading.ax);
+                acceleration.ay(oxts_reading.ay);
+                acceleration.az(oxts_reading.az);
+
+                opendlv::logic::sensation::Equilibrioception equilibrioception;
+                equilibrioception.rollRate(oxts_reading.wx);        
+                equilibrioception.pitchRate(oxts_reading.wy);
+                equilibrioception.yawRate(oxts_reading.wz);
+
+                od4.send(gps, sampleTime, IDSENDER);
+                od4.send(acceleration, sampleTime, IDSENDER);
+                od4.send(equilibrioception, sampleTime, IDSENDER);
+
+                if (VERBOSE){
+                    std::cout << "Frame: "<< NUM << " | Lat: " << oxts_reading.lat << ", Lon: " << oxts_reading.lon
+                    << ", Alt: " << oxts_reading.alt << ", Speed: " << oxts_reading.vf << ", Yaw: " << oxts_reading.yaw 
+                    << ", Roll Rate: " << oxts_reading.wx << ", Pitch Rate: " << oxts_reading.wy 
+                    << ", Yaw Rate: " << oxts_reading.wz << std::endl;
+                }
+                NUM ++;
+            }};
+
+            while(NUM != fileNum && od4.isRunning()){
+                od4.timeTrigger(FREQ, atFrequency);
+            }
+
+            retCode = 0;
+        }
+    }
+    return retCode;
 }

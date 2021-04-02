@@ -1,0 +1,16 @@
+version: "2.3"
+services:
+    opendlv-kitti-replay:
+        container_name: opendlv-kitti-replay
+        build:
+            context: ./opendlv-kitti-replay
+            dockerfile: Dockerfile
+        image: opendlv-kitti-replay:v0.1
+        restart: on-failure
+        network_mode: "host"
+        ipc: "host"
+        volumes:
+        - ${HOME}/Learning_PCL/Test_data/2011_09_26/2011_09_26_drive_0005_sync:/opt/recordings
+        - /tmp:/tmp
+        network_mode: "host"
+        command: "--cid=111 --freq=10 --name=video0.argb /opt/recordings/ --verbose"
