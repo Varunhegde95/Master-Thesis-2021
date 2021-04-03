@@ -50,10 +50,10 @@ public:
 
       // Initialize Odometer
       void Initialize(){
-         mx_ = 0.0;
-         my_ = 0.0;
-         mz_ = 0.0;
-         ds_ = 0.0;
+         mx_ = 0.0f;
+         my_ = 0.0f;
+         mz_ = 0.0f;
+         ds_ = 0.0f;
          std::cout << "Initialize Odometer, "; 
       }
 
@@ -62,10 +62,10 @@ public:
          float arc = 2.0 * M_PI * (float)(earthRadius_ + sensor_reading_now.alt)/360.0; 
          float dx  = arc * (float) cos(sensor_reading_now.lat * M_PI/180.0) * (sensor_reading_now.lon - sensor_reading_pre.lon); // [m]
          float dy  = arc * (sensor_reading_now.lat - sensor_reading_pre.lat); // [m]
-         float dz = sensor_reading_now.alt - sensor_reading_pre.alt;
+         //float dz = sensor_reading_now.alt - sensor_reading_pre.alt;
          mx_ += dx;
          my_ += dy;
-         mz_ += dz;
+         //mz_ += dz;
          ds_ = sqrt(dx*dx + dy*dy); 
       }
 };
@@ -148,11 +148,11 @@ public:
       p_p_ = Eigen::MatrixXf::Zero(10,10);
       measurements_ = Eigen::MatrixXf::Zero(8, 1);
       // UKF Initialize noise covariance
-      SetProcessNoiseCovatiance(8.8, 0.1, 1.0); // Initialize Q
-      SetMeasureNoiseCovatiance(6.0, 1.0, 0.01, 0.0017); // Initialize R
+      SetProcessNoiseCovatiance(8.8f, 0.1f, 1.0f); // Initialize Q
+      SetMeasureNoiseCovatiance(10.0f, 1.0f, 0.05f, 0.0017f); // Initialize R
       SetInitialCovariance(); // Initialize P0
-      x_f_ << odom.mx_, odom.my_, odom.mz_, sensor_reading.vf, 0.0f, 0.0f, sensor_reading.yaw, sensor_reading.wy, 
-               sensor_reading.wx, sensor_reading.wz, gamma_a_, gamma_pitch_, gamma_roll_, gamma_yaw_, gamma_z_;
+      x_f_ << odom.mx_, odom.my_, odom.mz_, sensor_reading.vf, 0.0f, 0.0f, sensor_reading.yaw, sensor_reading.wy/180*M_PI, 
+               sensor_reading.wx/180*M_PI, sensor_reading.wz/180*M_PI, gamma_a_, gamma_pitch_, gamma_roll_, gamma_yaw_, gamma_z_;
       p_f_ = P0_;
       std::cout << "Initialize UKF" << std::endl;
    }
@@ -239,7 +239,7 @@ public:
    // Read sensor data and save to 'measurement_' matrix [7x1]
    void 
     GetMeasurement(const Odometer &odom, const Sensor_Reading &sensor_reading){
-       measurements_ << odom.mx_, odom.my_, odom.mz_, sensor_reading.vf, sensor_reading.yaw, sensor_reading.wy, sensor_reading.wx, sensor_reading.wz;
+       measurements_ << odom.mx_, odom.my_, odom.mz_, sensor_reading.vf, sensor_reading.yaw, sensor_reading.wy/180*M_PI, sensor_reading.wx/180*M_PI, sensor_reading.wz/180*M_PI;
    }
 
    void 
