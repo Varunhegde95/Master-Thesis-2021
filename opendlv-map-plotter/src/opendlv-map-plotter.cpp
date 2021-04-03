@@ -52,7 +52,6 @@ int32_t main(int32_t argc, char **argv) {
             auto y = msg.y();  // UKF Position Y
             filteredX.push_back(x);
             filteredY.push_back(y);
-            // std::cout << "Get data" << std::endl;
         }};
 
         auto onRawReading{[&RawReadingMutex, &rawX, &rawY](cluon::data::Envelope &&envelope){
@@ -73,15 +72,13 @@ int32_t main(int32_t argc, char **argv) {
         {
             /*------ Visualization ------*/
             if(DISPLAY){
-                if (frameCount % 5 == 0){
-                    matplotlibcpp::clf(); // Clear [matplotlib] previous plot
-                    matplotlibcpp::scatter(rawX, rawY, 8);
-                    matplotlibcpp::named_plot("Filtered", filteredX, filteredY, "r-"); // Filtered positions
-                    matplotlibcpp::title("UKF Result");
-                    matplotlibcpp::legend(); // Enable legend
-                    matplotlibcpp::grid(true); // Enable Grid
-                    matplotlibcpp::pause(0.001);  // Display plot continuously
-                }
+                matplotlibcpp::clf(); // Clear [matplotlib] previous plot
+                matplotlibcpp::scatter(rawX, rawY, 8);
+                matplotlibcpp::named_plot("Filtered", filteredX, filteredY, "r-"); // Filtered positions
+                matplotlibcpp::title("UKF Result");
+                matplotlibcpp::legend(); // Enable legend
+                matplotlibcpp::grid(true); // Enable Grid
+                matplotlibcpp::pause(0.001);  // Display plot continuously
             }
 
             if(VERBOSE)

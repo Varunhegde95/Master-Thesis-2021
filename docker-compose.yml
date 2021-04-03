@@ -38,4 +38,4 @@ services:
         - DISPLAY=${DISPLAY}
         depends_on: 
         - "unscented-kalman-filter"
-        command: "--cid=111 --freq=10 --display --verbose"
+        command: "--cid=111 --freq=1 --display"
