@@ -1,7 +1,7 @@
 version: "2.3"
 services:
-    opendlv-kitti-replay:
-        container_name: opendlv-kitti-replay
+    kitti-replay:
+        container_name: kitti-replay
         build:
             context: ./opendlv-kitti-replay
             dockerfile: Dockerfile
@@ -10,7 +10,32 @@ services:
         network_mode: "host"
         ipc: "host"
         volumes:
-        - ${HOME}/Learning_PCL/Test_data/2011_09_26/2011_09_26_drive_0005_sync:/opt/recordings
+        - ${HOME}/Learning_PCL/Test_data/2011_09_26/2011_09_26_drive_0117_sync:/opt/recordings
         - /tmp:/tmp
         network_mode: "host"
-        command: "--cid=111 --freq=10 --name=video0.argb /opt/recordings/ --verbose"
+        command: "--cid=111 --freq=10 --name=video0.argb /opt/recordings/ --verbose --id-sender=100"
+    
+    unscented-kalman-filter:
+        container_name: unscented-kalman-filter
+        build:
+            context: ./opendlv-unscented-kalman-filter
+            dockerfile: Dockerfile
+        image: opendlv-unscented-kalman-filter
+        ipc: "host"
+        network_mode: "host"
+        depends_on:
+        - "kitti-replay"
+        command: "--cid=111 --freq=10 --imu-freq=10 --gps-freq=10 --verbose"
+
+    map-plotter:
+        container_name: map-plotter
+        build:
+            context: ./opendlv-map-plotter
+            dockerfile: Dockerfile
+        image: opendlv-map-plotter
+        network_mode: "host"
+        environment:
+        - DISPLAY=${DISPLAY}
+        depends_on: 
+        - "unscented-kalman-filter"
+        command: "--cid=111 --freq=10 --display --verbose"

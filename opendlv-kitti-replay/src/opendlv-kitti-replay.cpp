@@ -30,7 +30,7 @@ int32_t main(int32_t argc, char **argv) {
         std::cerr << "         --name:    name of the shared memory area to create" << std::endl;
         std::cerr << "         --verbose: print decoding information and display image" << std::endl;
         std::cerr << "         --id-sender: sender id of output messages" << std::endl;
-        std::cerr << "Example: " << argv[0] << " --cid=111 --name=data --verbose" << std::endl;
+        std::cerr << "Example: " << argv[0] << " --cid=111 --name=data --verbose --id-sender=100" << std::endl;
     }
     else {
         const std::string NAME{commandlineArguments["name"]};
@@ -71,33 +71,37 @@ int32_t main(int32_t argc, char **argv) {
             }
             timerCalculator(timer_oxts, "Loading all KITTI oxts data");
 
+            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Temporary Delay
+
             int16_t NUM = 0;
 
             auto atFrequency{[&VERBOSE, &od4, &oxts_data, &IDSENDER, &NUM]() -> bool{
                 cluon::data::TimeStamp sampleTime{cluon::time::now()};
                 auto oxts_reading = oxts_data[NUM];
 
-                opendlv::proxy::GeodeticWgs84Reading gps;
-                gps.latitude(oxts_reading.lat);            
-                gps.longitude(oxts_reading.lon);
-                gps.altitude(oxts_reading.alt);
+                opendlv::logic::sensation::Geolocation geolocation;
+                geolocation.latitude((float)oxts_reading.lat);            
+                geolocation.longitude((float)oxts_reading.lon);
+                geolocation.altitude((float)oxts_reading.alt);
+                geolocation.heading((float)oxts_reading.yaw);
 
                 opendlv::sensor::Acceleration acceleration;
-                acceleration.ax(oxts_reading.ax);
-                acceleration.ay(oxts_reading.ay);
-                acceleration.az(oxts_reading.az);
+                acceleration.ax((float)oxts_reading.ax);
+                acceleration.ay((float)oxts_reading.ay);
+                acceleration.az((float)oxts_reading.az);
 
                 opendlv::logic::sensation::Equilibrioception equilibrioception;
-                equilibrioception.rollRate(oxts_reading.wx);        
-                equilibrioception.pitchRate(oxts_reading.wy);
-                equilibrioception.yawRate(oxts_reading.wz);
+                equilibrioception.vx((float)oxts_reading.vf);        // Forward speed
+                equilibrioception.rollRate((float)oxts_reading.wx);        
+                equilibrioception.pitchRate((float)oxts_reading.wy);
+                equilibrioception.yawRate((float)oxts_reading.wz);
 
-                od4.send(gps, sampleTime, IDSENDER);
+                od4.send(geolocation, sampleTime, IDSENDER);
                 od4.send(acceleration, sampleTime, IDSENDER);
                 od4.send(equilibrioception, sampleTime, IDSENDER);
 
                 if (VERBOSE){
-                    std::cout << "Frame: "<< NUM << " | Lat: " << oxts_reading.lat << ", Lon: " << oxts_reading.lon
+                    std::cout << "Frame: " << NUM << " | Lat: " << oxts_reading.lat << ", Lon: " << oxts_reading.lon
                     << ", Alt: " << oxts_reading.alt << ", Speed: " << oxts_reading.vf << ", Yaw: " << oxts_reading.yaw 
                     << ", Roll Rate: " << oxts_reading.wx << ", Pitch Rate: " << oxts_reading.wy 
                     << ", Yaw Rate: " << oxts_reading.wz << std::endl;
