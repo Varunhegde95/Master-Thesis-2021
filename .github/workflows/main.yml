@@ -22,4 +22,7 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
+      - name: docker build kitti-replay
+        run: |
+          docker build ./opendlv-kitti-replay -t opendlv-kitti-replay:v0.1
 
