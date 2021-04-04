@@ -39,8 +39,8 @@ jobs:
           
       - name: push images to Docker Hub
         run: |
-          docker push thesis21/opendlv-kitti-replay:v0.1
-          docker push thesis21/opendlv-unscented-kalman-filter:v0.1
-          docker push thesis21/opendlv-map-plotter:v0.1
+          docker push leowang1997/opendlv-kitti-replay:v0.1
+          docker push leowang1997/opendlv-unscented-kalman-filter:v0.1
+          docker push leowang1997/opendlv-map-plotter:v0.1
         
 
