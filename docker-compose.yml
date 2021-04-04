@@ -20,7 +20,7 @@ services:
         build:
             context: ./opendlv-unscented-kalman-filter
             dockerfile: Dockerfile
-        image: opendlv-unscented-kalman-filter
+        image: opendlv-unscented-kalman-filter:v0.1
         ipc: "host"
         network_mode: "host"
         depends_on:
@@ -32,7 +32,7 @@ services:
         build:
             context: ./opendlv-map-plotter
             dockerfile: Dockerfile
-        image: opendlv-map-plotter
+        image: opendlv-map-plotter:v0.1
         network_mode: "host"
         environment:
         - DISPLAY=${DISPLAY}
