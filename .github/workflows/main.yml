@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: Docker Builds
 
 # Controls when the action will run. 
 on:
@@ -14,7 +14,7 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
-  build_Docker_1:
+  build:
     # The type of runner that the job will run on
     runs-on: ubuntu-18.04
 
@@ -22,4 +22,27 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
+      - name: Docker login
+        run: echo "${{secrets.DOCKER_PASSWORD}}" | docker login -u ${{secrets.DOCKER_USER}} --password-stdin
+        
+      - name: docker build 'Kitti Replay'
+        run: docker build ./opendlv-kitti-replay -t opendlv-kitti-replay
+          
+      - name: docker build 'Unscented Kalman Filter'
+        run: docker build ./opendlv-unscented-kalman-filter -t opendlv-unscented-kalman-filter
+          
+      - name: docker build 'Map Plotter'
+        run: docker build ./opendlv-map-plotter -t opendlv-map-plotter
+          
+      - name: push image
+        run: |
+          docker tag opendlv-kitti-replay leowang1997/opendlv-kitti-replay:v0.1
+          docker push leowang1997/opendlv-kitti-replay:v0.1
+          
+          docker tag opendlv-unscented-kalman-filter leowang1997/opendlv-unscented-kalman-filter:v0.1
+          docker push leowang1997/opendlv-unscented-kalman-filter:v0.1
+          
+          docker tag opendlv-map-plotter leowang1997/opendlv-map-plotter:v0.1
+          docker push leowang1997/opendlv-map-plotter:v0.1
+        
 
