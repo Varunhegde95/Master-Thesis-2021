@@ -29,18 +29,18 @@ jobs:
         run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
         
       - name: docker build 'Kitti Replay'
-        run: docker build ./opendlv-kitti-replay -t Thesis21/opendlv-kitti-replay:v0.1
+        run: docker build ./opendlv-kitti-replay -t thesis21/opendlv-kitti-replay:v0.1
           
       - name: docker build 'Unscented Kalman Filter'
-        run: docker build ./opendlv-unscented-kalman-filter -t Thesis21/opendlv-unscented-kalman-filter:v0.1
+        run: docker build ./opendlv-unscented-kalman-filter -t thesis21/opendlv-unscented-kalman-filter:v0.1
           
       - name: docker build 'Map Plotter'
-        run: docker build ./opendlv-map-plotter -t Thesis21/opendlv-map-plotter:v0.1
+        run: docker build ./opendlv-map-plotter -t thesis21/opendlv-map-plotter:v0.1
           
       - name: push images to Docker Hub
         run: |
-          docker push Thesis21/opendlv-kitti-replay:v0.1
-          docker push Thesis21/opendlv-unscented-kalman-filter:v0.1
-          docker push Thesis21/opendlv-map-plotter:v0.1
+          docker push thesis21/opendlv-kitti-replay:v0.1
+          docker push thesis21/opendlv-unscented-kalman-filter:v0.1
+          docker push thesis21/opendlv-map-plotter:v0.1
         
 
