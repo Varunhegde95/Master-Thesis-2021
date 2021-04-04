@@ -16,7 +16,8 @@
  */
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
-#include <pcl/point_types.h>
+
+#include "preprocessing.hpp"
 
 int32_t main(int32_t argc, char **argv) {
     
