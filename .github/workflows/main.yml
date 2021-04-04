@@ -23,24 +23,20 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
       - name: Docker login
-        env: 
-          DOCKER_USER: ${{secrets.DOCKER_USER}} 
-          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}    
         run: echo "${{secrets.DOCKER_PASSWORD}}" | docker login -u ${{secrets.DOCKER_USER}} --password-stdin
         
       - name: docker build 'Kitti Replay'
-        run: docker build ./opendlv-kitti-replay -t leowang1997/opendlv-kitti-replay:v0.1
+        run: docker build ./opendlv-kitti-replay -t opendlv-kitti-replay
           
       - name: docker build 'Unscented Kalman Filter'
-        run: docker build ./opendlv-unscented-kalman-filter -t leowang1997/opendlv-unscented-kalman-filter:v0.1
+        run: docker build ./opendlv-unscented-kalman-filter -t opendlv-unscented-kalman-filter
           
       - name: docker build 'Map Plotter'
-        run: docker build ./opendlv-map-plotter -t leowang1997/opendlv-map-plotter:v0.1
+        run: docker build ./opendlv-map-plotter -t opendlv-map-plotter
           
-      - name: push images to Docker Hub
+      - name: push image
         run: |
+          docker tag opendlv-kitti-replay leowang1997/opendlv-kitti-replay:v0.1
           docker push leowang1997/opendlv-kitti-replay:v0.1
-          docker push leowang1997/opendlv-unscented-kalman-filter:v0.1
-          docker push leowang1997/opendlv-map-plotter:v0.1
         
 
