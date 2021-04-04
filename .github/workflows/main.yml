@@ -38,5 +38,11 @@ jobs:
         run: |
           docker tag opendlv-kitti-replay leowang1997/opendlv-kitti-replay:v0.1
           docker push leowang1997/opendlv-kitti-replay:v0.1
+          
+          docker tag opendlv-unscented-kalman-filter leowang1997/opendlv-unscented-kalman-filter:v0.1
+          docker push leowang1997/opendlv-unscented-kalman-filter:v0.1
+          
+          docker tag opendlv-map-plotter leowang1997/opendlv-map-plotter:v0.1
+          docker push leowang1997/opendlv-map-plotter:v0.1
         
 
