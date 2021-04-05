@@ -79,6 +79,8 @@ int32_t main(int32_t argc, char **argv) {
                 cluon::data::TimeStamp sampleTime{cluon::time::now()};
                 auto oxts_reading = oxts_data[NUM];
 
+                
+
                 opendlv::logic::sensation::Geolocation geolocation;
                 geolocation.latitude((float)oxts_reading.lat);            
                 geolocation.longitude((float)oxts_reading.lon);

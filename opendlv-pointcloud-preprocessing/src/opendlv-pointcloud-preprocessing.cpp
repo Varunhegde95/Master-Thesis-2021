@@ -20,6 +20,23 @@
 #include "preprocessing.hpp"
 
 int32_t main(int32_t argc, char **argv) {
-    
-    return 0;
+    int32_t retCode{1};
+    const std::string PROGRAM{argv[0]};
+    auto commandlineArguments = cluon::getCommandlineArguments(argc, argv);
+    if ((0 == commandlineArguments.count("cid")) ||
+        (0 == commandlineArguments.count("freq")) ) {
+        std::cerr << "         --cid:     CID of the OD4Session to replay other Envelopes" << std::endl;
+        std::cerr << "         --freq:    Frequency to send out the KITTI data [IMU, GPS, Lidar]" << std::endl;
+        std::cerr << "         --name:    name of the shared memory area to create" << std::endl;
+        std::cerr << "         --verbose: print decoding information and display image" << std::endl;
+        std::cerr << "         --id-sender: sender id of output messages" << std::endl;
+        std::cerr << "Example: " << argv[0] << " --cid=111 --name=data --verbose --id-sender=100" << std::endl;
+    }
+    else {
+
+
+        
+        retCode = 0;
+    }
+    return retCode;
 }

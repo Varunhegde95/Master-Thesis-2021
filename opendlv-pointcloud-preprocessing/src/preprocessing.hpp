@@ -54,4 +54,20 @@ struct Box{
 	float z_max;
 };
 
+bool point_cmp(pcl::PointXYZ a, pcl::PointXYZ b){
+    return a.z<b.z;
+};
+
+enum CameraAngle {TOP, FPS, SIDE};
+
+struct Color{
+    float R, G, B;
+
+	Color(float setR, float setG, float setB)
+		: R(setR), G(setG), B(setB)
+	{}
+};
+
+
+
 #endif /*PREPROCESSING_HPP*/
