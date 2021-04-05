@@ -21,19 +21,47 @@ RUN apt-get update -y && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
     cmake \
+    git \
     build-essential \
     software-properties-common
 
 
 RUN apt-get update
 RUN apt-get install -y libeigen3-dev \
-    libpcl-dev
+    libflann-dev \
+    libboost-all-dev \
+    linux-libc-dev \
+    libudev-dev \
+    mpi-default-dev \
+    openmpi-bin \
+    openmpi-common \
+    libvtk6.3-qt \
+    libvtk6.3 \
+    libvtk6-dev \
+    libqhull* \
+    libgtest-dev \
+    freeglut3-dev \
+    pkg-config \
+    libxmu-dev \
+    libxi-dev \ 
+    mono-complete \
+    libqt4-dev \
+    openjdk-8-jdk \
+    openjdk-8-jre
+
+ADD . /opt/sources
+WORKDIR /opt/sources
+RUN git clone https://github.com/PointCloudLibrary/pcl.git && \
+      cd pcl && \
+      git checkout -b 1.8.1 refs/tags/pcl-1.8.1 && \
+      mkdir build && cd build && cmake -D CMAKE_INSTALL_PREFIX=/usr/local .. && \
+      make -j$(nproc) && make install
 
 RUN add-apt-repository -y ppa:chrberger/libcluon
 RUN apt-get update
 RUN apt-get install -y libcluon
 
-ADD . /opt/sources
+#ADD . /opt/sources
 WORKDIR /opt/sources
 RUN mkdir build && \
     cd build && \

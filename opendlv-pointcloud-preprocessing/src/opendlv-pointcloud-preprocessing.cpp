@@ -33,9 +33,9 @@ int32_t main(int32_t argc, char **argv) {
         std::cerr << "Example: " << argv[0] << " --cid=111 --name=data --verbose --id-sender=100" << std::endl;
     }
     else {
+        std::cout << " " << std::endl;
+    
 
-
-        
         retCode = 0;
     }
     return retCode;

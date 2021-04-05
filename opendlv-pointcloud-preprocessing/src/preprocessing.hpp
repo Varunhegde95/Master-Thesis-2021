@@ -9,6 +9,16 @@
  * E-mail:    liangyu@student.chalmers.se
  * Date:      03/2020
  */
+#include <iostream>
+//#include <fstream>
+#include <memory>
+#include <thread>
+#include <random>
+#include <cstdlib>
+#include <chrono>
+#include <dirent.h>
+#include <algorithm>
+#include <string>
 
 // PCL Library
 #include <pcl/point_types.h>

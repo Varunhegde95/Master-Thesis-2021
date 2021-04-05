@@ -33,6 +33,9 @@ jobs:
           
       - name: docker build 'Map Plotter'
         run: docker build ./opendlv-map-plotter -t opendlv-map-plotter
+      
+      - name: docker build 'pointcloud_processing'
+        run: docker build ./opendlv-pointcloud_processing -t opendlv-pointcloud_processing
           
       - name: push image
         run: |
@@ -44,5 +47,8 @@ jobs:
           
           docker tag opendlv-map-plotter leowang1997/opendlv-map-plotter:v0.1
           docker push leowang1997/opendlv-map-plotter:v0.1
+
+          docker tag opendlv-pointcloud_processing leowang1997/opendlv-pointcloud_processing:v0.1
+          docker push leowang1997/opendlv-pointcloud_processing:v0.1
         
 

@@ -1,4 +1,11 @@
 version: "3.1"
+volumes:
+    shared-tmpfs:
+      driver: local
+      driver_opts:
+        type: "tmpfs"
+        device: "tmpfs"
+        o: "size=256m,uid=1000"
 services:
     kitti-replay:
         container_name: kitti-replay
@@ -12,6 +19,7 @@ services:
         volumes:
         - ${HOME}/Learning_PCL/Test_data/2011_09_26/2011_09_26_drive_0117_sync:/opt/recordings
         - /tmp:/tmp
+        - shared-tmpfs:/tmp/mytmpfs
         network_mode: "host"
         command: "--cid=111 --freq=10 --name=video0.argb /opt/recordings/ --verbose --id-sender=100"
     
@@ -39,3 +47,17 @@ services:
         depends_on: 
         - "unscented-kalman-filter"
         command: "--cid=111 --freq=1 --display"
+
+    pointcloud_processing:
+        container_name: pointcloud_processing
+        build:
+            context: ./opendlv-pointcloud-preprocessing
+            dockerfile: Dockerfile
+        image: opendlv-pointcloud-preprocessing:v0.1
+        ipc: "host"
+        network_mode: "host"
+        depends_on:
+        - "kitti-replay"
+        volumes:
+        - shared-tmpfs:/tmp/mytmpfs
+        command: "--cid=111 --freq=10 -verbose"
