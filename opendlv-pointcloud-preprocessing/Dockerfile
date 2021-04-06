@@ -54,7 +54,7 @@ RUN cd /opt && git clone https://github.com/Kitware/VTK.git VTK
 RUN cd /opt/VTK && git checkout tags/v8.0.0
 RUN cd /opt/VTK && mkdir build
 RUN cd /opt/VTK/build && cmake -DCMAKE_BUILD_TYPE:STRING=Release -D VTK_RENDERING_BACKEND=OpenGL ..
-RUN cd /opt/VTK/build && make -j 32 && make install
+RUN cd /opt/VTK/build && make -j$(nproc) && make install
 
 
 # Install PCL
@@ -62,7 +62,7 @@ RUN cd /opt && git clone https://github.com/Airsquire/pcl pcl
 RUN cd /opt/pcl && git checkout master
 RUN mkdir -p /opt/pcl/build
 RUN cd /opt/pcl/build && cmake -D BUILD_visualization=true -D VTK_DIR=/opt/VTK/build -D BUILD_2d=true -D BUILD_tools=false ..
-RUN cd /opt/pcl/build && make -j 32 && make install
+RUN cd /opt/pcl/build && make -j$(nproc) && make install
 RUN cd /opt/pcl/build && make clean
 
 
