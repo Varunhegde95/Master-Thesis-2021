@@ -25,36 +25,50 @@ RUN apt-get update -y && \
     build-essential \
     software-properties-common
 
+# Install PCL library
+ADD . /opt/sources
+WORKDIR /opt/sources
+ENV PCL_VERSION="1.8.1"
 
 RUN apt-get update
-RUN apt-get install -y libeigen3-dev \
+RUN apt-get install -y \
+    libeigen3-dev \
     libflann-dev \
+    libglu1-mesa-dev \
+    freeglut3-dev \
+    mesa-common-dev \
     libboost-all-dev \
-    linux-libc-dev \
-    libudev-dev \
+    libusb-1.0-0-dev \
+    libusb-dev \
+    libopenni-dev \
+    libopenni2-dev \
+    libpcap-dev \
+    libpng-dev \
     mpi-default-dev \
     openmpi-bin \
     openmpi-common \
-    libvtk6.3-qt \
-    libvtk6.3 \
-    libvtk6-dev \
-    libqhull* \
-    libgtest-dev \
-    freeglut3-dev \
-    pkg-config \
-    libxmu-dev \
-    libxi-dev \ 
-    mono-complete \
-    libqt4-dev \
-    openjdk-8-jdk \
-    openjdk-8-jre \
-    libpcl-all
+    libqhull-dev \
+    libgtest-dev
+
+RUN wget https://github.com/PointCloudLibrary/pcl/archive/pcl-${PCL_VERSION}.tar.gz \
+    && tar -xf pcl-${PCL_VERSION}.tar.gz \
+    && cd pcl-pcl-${PCL_VERSION} \
+    && mkdir build \
+    && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release \
+                -DVTK_RENDERING_BACKEND=OpenGL2 \
+    && make -j12 \
+    && make install
+
+RUN apt-get update && apt-get install -y pcl-tools
+
+RUN unset PCL_VERSION
 
 RUN add-apt-repository -y ppa:chrberger/libcluon
 RUN apt-get update
 RUN apt-get install -y libcluon
 
-ADD . /opt/sources
+#ADD . /opt/sources
 WORKDIR /opt/sources
 RUN mkdir build && \
     cd build && \
