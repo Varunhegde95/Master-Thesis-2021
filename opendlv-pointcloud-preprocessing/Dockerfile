@@ -28,16 +28,15 @@ RUN apt-get update -y && \
     autotools-dev \
     libicu-dev \
     libboost-all-dev \
-    libeigen3-dev \
+    libeigen3-dev 
 
 RUN apt-get install -y  \
-  mc \
-  lynx \
-  libqhull* \
-  pkg-config \
-  libxmu-dev \
-  libxi-dev \
-  --no-install-recommends --fix-missing
+    mc \
+    lynx \
+    libqhull* \
+    pkg-config \
+    libxmu-dev \
+    libxi-dev
 
 RUN apt-get install -y  \
   mesa-common-dev \
