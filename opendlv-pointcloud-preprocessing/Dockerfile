@@ -24,46 +24,53 @@ RUN apt-get update -y && \
     git \
     wget \
     build-essential \
-    software-properties-common
+    software-properties-common \
+    autotools-dev \
+    libicu-dev \
+    libboost-all-dev
 
-# Install PCL library
-ADD . /opt/sources
-WORKDIR /opt/sources
-ENV PCL_VERSION="1.8.1"
+RUN apt-get install -y  \
+  mc \
+  lynx \
+  libqhull* \
+  pkg-config \
+  libxmu-dev \
+  libxi-dev \
+  --no-install-recommends --fix-missing
 
-RUN apt-get update
-RUN apt-get install -y \
-    libeigen3-dev \
-    libflann-dev \
-    libglu1-mesa-dev \
-    freeglut3-dev \
-    mesa-common-dev \
-    libboost-all-dev \
-    libusb-1.0-0-dev \
-    libusb-dev \
-    libopenni-dev \
-    libopenni2-dev \
-    libpcap-dev \
-    libpng-dev \
-    mpi-default-dev \
-    openmpi-bin \
-    openmpi-common \
-    libqhull-dev \
-    libgtest-dev
+RUN apt-get install -y  \
+  mesa-common-dev \
+  cmake  \
+  git  \
+  mercurial \
+  freeglut3-dev \
+  libflann-dev \
+  --no-install-recommends --fix-missing
 
-RUN wget https://github.com/PointCloudLibrary/pcl/archive/pcl-${PCL_VERSION}.tar.gz \
-    && tar -xf pcl-${PCL_VERSION}.tar.gz \
-    && cd pcl-pcl-${PCL_VERSION} \
-    && mkdir build \
-    && cd build \
-    && cmake .. -DCMAKE_BUILD_TYPE=Release \
-                -DVTK_RENDERING_BACKEND=OpenGL2 \
-    && make -j12 \
-    && make install
+RUN apt-get autoremove
 
-RUN apt-get update && apt-get install -y pcl-tools
+# Install Eigen
+RUN cd /opt && hg clone -r 3.2 https://bitbucket.org/eigen/eigen eigen
+RUN mkdir -p /opt/eigen/build
+RUN cd /opt/eigen/build && cmake ..
+RUN cd /opt/eigen/build && make install
 
-RUN unset PCL_VERSION
+# Install VTK
+RUN cd /opt && git clone git://vtk.org/VTK.git VTK
+RUN cd /opt/VTK && git checkout tags/v8.0.0
+RUN cd /opt/VTK && mkdir build
+RUN cd /opt/VTK/build && cmake -DCMAKE_BUILD_TYPE:STRING=Release -D VTK_RENDERING_BACKEND=OpenGL ..
+RUN cd /opt/VTK/build && make -j 32 && make install
+
+
+# Install PCL
+RUN cd /opt && git clone https://github.com/Airsquire/pcl pcl
+RUN cd /opt/pcl && git checkout master
+RUN mkdir -p /opt/pcl/build
+RUN cd /opt/pcl/build && cmake -D BUILD_visualization=true -D VTK_DIR=/opt/VTK/build -D BUILD_2d=true -D BUILD_tools=false ..
+RUN cd /opt/pcl/build && make -j 32 && make install
+RUN cd /opt/pcl/build && make clean
+
 
 RUN add-apt-repository -y ppa:chrberger/libcluon
 RUN apt-get update
