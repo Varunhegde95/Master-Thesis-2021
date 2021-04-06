@@ -50,7 +50,7 @@ RUN apt-get install -y  \
 RUN apt-get autoremove
 
 # Install VTK
-RUN cd /opt && git clone git://vtk.org/VTK.git VTK
+RUN cd /opt && git clone git@github.com:Kitware/VTK.git VTK
 RUN cd /opt/VTK && git checkout tags/v8.0.0
 RUN cd /opt/VTK && mkdir build
 RUN cd /opt/VTK/build && cmake -DCMAKE_BUILD_TYPE:STRING=Release -D VTK_RENDERING_BACKEND=OpenGL ..
