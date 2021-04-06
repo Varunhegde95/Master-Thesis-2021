@@ -27,7 +27,8 @@ RUN apt-get update -y && \
     software-properties-common \
     autotools-dev \
     libicu-dev \
-    libboost-all-dev
+    libboost-all-dev \
+    libeigen3-dev \
 
 RUN apt-get install -y  \
   mc \
@@ -48,12 +49,6 @@ RUN apt-get install -y  \
   --no-install-recommends --fix-missing
 
 RUN apt-get autoremove
-
-# Install Eigen
-RUN cd /opt && hg clone -r 3.2 https://bitbucket.org/eigen/eigen eigen
-RUN mkdir -p /opt/eigen/build
-RUN cd /opt/eigen/build && cmake ..
-RUN cd /opt/eigen/build && make install
 
 # Install VTK
 RUN cd /opt && git clone git://vtk.org/VTK.git VTK
