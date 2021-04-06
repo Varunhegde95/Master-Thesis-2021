@@ -70,7 +70,7 @@ RUN add-apt-repository -y ppa:chrberger/libcluon
 RUN apt-get update
 RUN apt-get install -y libcluon
 
-#ADD . /opt/sources
+ADD . /opt/sources
 WORKDIR /opt/sources
 RUN mkdir build && \
     cd build && \

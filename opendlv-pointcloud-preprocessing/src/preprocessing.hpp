@@ -87,10 +87,55 @@ public:
 
     // Destructor
     ~Filters() = default;
-    typename pcl::PointCloud<PointT>::Ptr PassThroughFilter( const typename pcl::PointCloud<PointT>::Ptr &cloud, const std::string &axis, const std::array<float, 2> &limits);
-    typename pcl::PointCloud<PointT>::Ptr VoxelGridDownSampling( const typename pcl::PCLPointCloud2::Ptr &cloud2, const float &filterRes);
+    typename pcl::PointCloud<PointT>::Ptr PassThroughFilter( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
+															 const std::string &axis, 
+															 const std::array<float, 2> &limits){
+		typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
+		pcl::PassThrough<PointT> passFilter;
+		passFilter.setInputCloud(cloud);  	 // Set input point cloud 
+		passFilter.setFilterFieldName(axis); // Set filter axis
+		passFilter.setFilterLimits(limits[0], limits[1]); // Set the filter acceptable range
+		passFilter.filter(*cloud_filtered);
+		std::cout << "[PassFilter " << axis << "(" << limits[0] << " -> " << limits[1] << ") ] " << " Original points: " 
+				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
+		return cloud_filtered;
+	}
+	typename pcl::PointCloud<PointT>::Ptr boxFilter( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
+													 const Eigen::Vector4f &min_point, 
+													 const Eigen::Vector4f &max_point, 
+													 const bool &setNegative = false){
+		pcl::CropBox<PointT> region(true);
+		std::vector<int> indices;
+		region.setMin(min_point);
+		region.setMax(max_point);
+		region.setInputCloud(cloud);
+		region.filter(indices);
+		pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+		for (int index : indices)
+			inliers->indices.push_back(index);
+		pcl::ExtractIndices<PointT> extract;
+		// Extract the noise point cloud on the roof
+		extract.setInputCloud(cloud);
+		extract.setIndices(inliers);
+		extract.setNegative(setNegative);
+		extract.filter(*cloud);
+		return cloud;
+	}
+
+	// DownSample the dataset using a given leaf size
+    typename pcl::PointCloud<PointT>::Ptr VoxelGridDownSampling( const typename pcl::PCLPointCloud2::Ptr &cloud2, 
+																 const float &filterRes){
+		pcl::PCLPointCloud2::Ptr cloud2_filtered(new pcl::PCLPointCloud2()); // Create filtered object
+		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
+		pcl::VoxelGrid<pcl::PCLPointCloud2> voxelFilter;
+		voxelFilter.setInputCloud(cloud2); // Set input point cloud
+		voxelFilter.setLeafSize(filterRes, filterRes, filterRes); // Set voxel size
+		voxelFilter.filter(*cloud2_filtered);
+		pcl::fromPCLPointCloud2(*cloud2_filtered, *cloud_filtered); // PCLPointCloud2 ---> pcl::PointXYZ
+		std::cout << "[VoxelGridDownSampling]  Original points: " << cloud2->width * cloud2->height <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
+		return cloud_filtered;
+	}
     typename pcl::PointCloud<PointT>::Ptr StatisticalOutlierRemoval( const typename pcl::PointCloud<PointT>::Ptr &cloud, const int &meanK, const double &StddevMulThresh );
-    typename pcl::PointCloud<PointT>::Ptr boxFilter( const typename pcl::PointCloud<PointT>::Ptr &cloud, const Eigen::Vector4f &min_point, const Eigen::Vector4f &max_point, const bool &setNegative = false);
 };
 
 #endif /*PREPROCESSING_HPP*/
