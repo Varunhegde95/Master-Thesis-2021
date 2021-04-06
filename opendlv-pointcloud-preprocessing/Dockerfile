@@ -22,6 +22,7 @@ RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     cmake \
     git \
+    wget \
     build-essential \
     software-properties-common
 
