@@ -33,7 +33,14 @@ int32_t main(int32_t argc, char **argv) {
         std::cerr << "Example: " << argv[0] << " --cid=111 --name=data --verbose --id-sender=100" << std::endl;
     }
     else {
-        std::cout << "TEST" << std::endl;
+        float const FREQ{std::stof(commandlineArguments["freq"])}; // Frequency
+        const bool VERBOSE{commandlineArguments.count("verbose") != 0};
+        uint32_t const IDSENDER{(commandlineArguments["id-sender"].size() != 0)               
+            ? static_cast<uint32_t>(std::stoi(commandlineArguments["id-sender"])) : 0};
+
+        // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
+        cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
+
     
 
         retCode = 0;
