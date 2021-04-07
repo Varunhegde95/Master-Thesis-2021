@@ -31,8 +31,6 @@ RUN apt-get install -y libeigen3-dev \
     libboost-all-dev \
     libpcl-dev
 
-RUN dpkg -L libboost-system1.65.1 
-
 RUN add-apt-repository -y ppa:chrberger/libcluon
 RUN apt-get update
 RUN apt-get install -y libcluon
@@ -49,14 +47,15 @@ FROM ubuntu:18.04
 MAINTAINER Liangyu Wang "liangyu@student.chalmers.se"
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update
-RUN apt-get install -y libeigen3-dev \
-    libflann-dev \
-    libboost-all-dev \
-    libpcl-dev
+#RUN apt-get update
+#RUN apt-get install -y libeigen3-dev \
+#    libflann-dev \
+#    libboost-all-dev \
+#    libpcl-dev
     
-RUN dpkg -L libboost-system1.65.1 
+#RUN dpkg -L libboost-system1.65.1 
 
 WORKDIR /usr/bin
+COPY --from=builder /usr/share /usr/share
 COPY --from=builder /tmp/dest /usr
 ENTRYPOINT ["/usr/bin/opendlv-pointcloud-preprocessing"]
