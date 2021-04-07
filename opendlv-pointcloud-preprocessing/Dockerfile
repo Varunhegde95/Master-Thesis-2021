@@ -25,6 +25,12 @@ RUN apt-get update -y && \
     build-essential \
     software-properties-common
 
+RUN apt-get update
+RUN apt-get install -y libeigen3-dev \
+    libflann-dev \
+    libboost-all-dev \
+    libpcl-dev
+
 RUN add-apt-repository -y ppa:chrberger/libcluon
 RUN apt-get update
 RUN apt-get install -y libcluon
