@@ -1,11 +1,4 @@
 version: "3.1"
-volumes:
-    shared-tmpfs:
-      driver: local
-      driver_opts:
-        type: "tmpfs"
-        device: "tmpfs"
-        o: "size=256m,uid=1000"
 services:
     kitti-replay:
         container_name: kitti-replay
@@ -19,7 +12,6 @@ services:
         volumes:
         - ${HOME}/Learning_PCL/Test_data/2011_09_26/2011_09_26_drive_0117_sync:/opt/recordings
         - /tmp:/tmp
-        - shared-tmpfs:/tmp/mytmpfs
         network_mode: "host"
         command: "--cid=111 --freq=10 --name=video0.argb /opt/recordings/ --verbose --id-sender=100"
     
@@ -59,5 +51,5 @@ services:
         depends_on:
         - "kitti-replay"
         volumes:
-        - shared-tmpfs:/tmp/mytmpfs
+        - ${HOME}/Learning_PCL/Test_data/2011_09_26/2011_09_26_drive_0117_sync:/opt/recordings
         command: "--cid=111 --freq=10 -verbose"

@@ -87,6 +87,7 @@ public:
 
     // Destructor
     ~Filters() = default;
+	
     typename pcl::PointCloud<PointT>::Ptr PassThroughFilter( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
 															 const std::string &axis, 
 															 const std::array<float, 2> &limits){
@@ -100,6 +101,7 @@ public:
 				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
 		return cloud_filtered;
 	}
+
 	typename pcl::PointCloud<PointT>::Ptr boxFilter( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
 													 const Eigen::Vector4f &min_point, 
 													 const Eigen::Vector4f &max_point, 
@@ -135,7 +137,20 @@ public:
 		std::cout << "[VoxelGridDownSampling]  Original points: " << cloud2->width * cloud2->height <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
 		return cloud_filtered;
 	}
-    typename pcl::PointCloud<PointT>::Ptr StatisticalOutlierRemoval( const typename pcl::PointCloud<PointT>::Ptr &cloud, const int &meanK, const double &StddevMulThresh );
+    typename pcl::PointCloud<PointT>::Ptr StatisticalOutlierRemoval( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
+																	 const int &meanK, 
+																	 const double &StddevMulThresh ){
+    typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
+		pcl::StatisticalOutlierRemoval<PointT> sor;
+		sor.setInputCloud(cloud);
+		sor.setMeanK(meanK); // Set the number of nearest neighbors to use for mean distance estimation.
+		sor.setStddevMulThresh(StddevMulThresh); // Set threshold for determining outliers [smaller -> more stringent]
+		// sor.setNegative(true);
+		sor.filter(*cloud_filtered);
+		std::cout << "[StatisticalOutlierRemoval] " << " Original points: " 
+				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
+		return cloud_filtered;
+	}  // Can be used for reducing noise
 };
 
 #endif /*PREPROCESSING_HPP*/
