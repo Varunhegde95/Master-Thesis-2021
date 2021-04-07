@@ -54,6 +54,5 @@ RUN apt-get install -y libeigen3-dev \
     libpcl-dev
     
 WORKDIR /usr/bin
-COPY --from=builder /usr/share /usr/share
 COPY --from=builder /tmp/dest /usr
 ENTRYPOINT ["/usr/bin/opendlv-pointcloud-preprocessing"]
