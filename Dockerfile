@@ -22,8 +22,49 @@ RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     cmake \
     git \
+    wget \
     build-essential \
-    software-properties-common
+    software-properties-common \
+    autotools-dev \
+    libicu-dev \
+    libboost-all-dev \
+    libeigen3-dev 
+
+RUN apt-get install -y  \
+    mc \
+    lynx \
+    libqhull* \
+    pkg-config \
+    libxmu-dev \
+    libxi-dev
+
+RUN apt-get install -y  \
+  mesa-common-dev \
+  cmake  \
+  git  \
+  mercurial \
+  freeglut3-dev \
+  libflann-dev \
+  --no-install-recommends --fix-missing
+
+RUN apt-get autoremove
+
+# Install VTK
+RUN cd /opt && git clone https://github.com/Kitware/VTK.git VTK
+RUN cd /opt/VTK && git checkout tags/v8.0.0
+RUN cd /opt/VTK && mkdir build
+RUN cd /opt/VTK/build && cmake -DCMAKE_BUILD_TYPE:STRING=Release -D VTK_RENDERING_BACKEND=OpenGL ..
+RUN cd /opt/VTK/build && make -j$(nproc) && make install
+
+
+# Install PCL
+RUN cd /opt && git clone https://github.com/Airsquire/pcl pcl
+RUN cd /opt/pcl && git checkout master
+RUN mkdir -p /opt/pcl/build
+RUN cd /opt/pcl/build && cmake -D BUILD_visualization=true -D VTK_DIR=/opt/VTK/build -D BUILD_2d=true -D BUILD_tools=false ..
+RUN cd /opt/pcl/build && make -j$(nproc) && make install
+RUN cd /opt/pcl/build && make clean
+
 
 RUN add-apt-repository -y ppa:chrberger/libcluon
 RUN apt-get update
@@ -41,12 +82,7 @@ FROM ubuntu:18.04
 MAINTAINER Liangyu Wang "liangyu@student.chalmers.se"
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update
-RUN apt-get install -y libeigen3-dev \
-    libflann-dev \
-    libboost-all-dev \
-    libpcl-dev
-
 WORKDIR /usr/bin
 COPY --from=builder /tmp/dest /usr
 ENTRYPOINT ["/usr/bin/opendlv-pointcloud-preprocessing"]
+
