@@ -31,7 +31,7 @@ RUN apt-get install -y libeigen3-dev \
     libboost-all-dev \
     libpcl-dev
 
-RUN dpkg -L dpkg -L libboost-system1.65.1 
+RUN dpkg -L libboost-system1.65.1 
 
 RUN add-apt-repository -y ppa:chrberger/libcluon
 RUN apt-get update
@@ -55,7 +55,7 @@ RUN apt-get install -y libeigen3-dev \
     libboost-all-dev \
     libpcl-dev
     
-RUN dpkg -L dpkg -L libboost-system1.65.1 
+RUN dpkg -L libboost-system1.65.1 
 
 WORKDIR /usr/bin
 COPY --from=builder /tmp/dest /usr
