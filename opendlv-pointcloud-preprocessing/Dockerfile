@@ -14,7 +14,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Part to build opendlv-pointcloud-preprocessing.
-FROM ubuntu:18.04 as builder
+FROM nvidia/opengl:1.0-glvnd-devel-ubuntu18.04 as builder
 ENV DEBIAN_FRONTEND=noninteractive
 MAINTAINER Liangyu Wang "liangyu@student.chalmers.se"
 RUN apt-get update -y && \
@@ -23,12 +23,15 @@ RUN apt-get update -y && \
     cmake \
     git \
     build-essential \
-    software-properties-common
+    software-properties-common \
+    libglm-dev
 
-RUN apt-get update
-RUN apt-get install -y libeigen3-dev \
+RUN apt-get update -y && \
+    apt-get install -y libeigen3-dev \
     libflann-dev \
+    libvtk6-qt-dev \
     libboost-all-dev \
+    libglew-dev \
     libpcl-dev
 
 RUN add-apt-repository -y ppa:chrberger/libcluon
@@ -43,15 +46,19 @@ RUN mkdir build && \
     make && make install
 
 # Part to deploy opendlv-pointcloud-preprocessing
-FROM ubuntu:18.04
+FROM nvidia/opengl:1.0-glvnd-runtime-ubuntu18.04
 MAINTAINER Liangyu Wang "liangyu@student.chalmers.se"
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update
-RUN apt-get install -y libeigen3-dev \
+RUN apt-get update -y && \
+    apt-get install -y libeigen3-dev \
     libflann-dev \
+    libvtk6-qt-dev \
     libboost-all-dev \
-    libpcl-dev
+    libpcl-dev \
+    libglm-dev \
+    libopengl0 \
+    libglew2.0
     
 WORKDIR /usr/bin
 COPY --from=builder /tmp/dest /usr

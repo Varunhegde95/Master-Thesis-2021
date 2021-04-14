@@ -56,6 +56,17 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 set(LIBRARIES Threads::Threads)
 
+# Find and include Eigen
+find_package(Eigen3 REQUIRED)
+include_directories(${EIGEN3_INCLUDE_DIRS})
+
+# FInd and include PCL
+find_package(PCL REQUIRED)
+# link_directories must be before add_executable
+include_directories(${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions( ${PCL_DEFINITIONS} )
+
 # If on Linux, find and include LibRT
 if(UNIX)
     if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
@@ -72,7 +83,7 @@ add_executable(${PROJECT_NAME}
   ${CMAKE_BINARY_DIR}/opendlv-standard-message-set.hpp
   ${CMAKE_BINARY_DIR}/cluon-complete.hpp
 )
-target_link_libraries(${PROJECT_NAME} ${LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${LIBRARIES} ${PCL_LIBRARIES})
 
 ################################################################################
 # Install executable.

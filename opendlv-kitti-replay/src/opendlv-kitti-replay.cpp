@@ -56,12 +56,12 @@ int32_t main(int32_t argc, char **argv) {
             std::cerr << argv[0] << ": Failed to open '" << kittiPath << "'" << std::endl;
         else{
             std::string oxtsPath  = kittiPath + "oxts/data/";
-            std::string lidarPath = kittiPath + "velodyne_points/data/";
+            //std::string lidarPath = kittiPath + "velodyne_points/data/";
             std::vector<std::string> files_oxts;
-            std::vector<std::string> files_lidar;
+            //std::vector<std::string> files_lidar;
             int16_t fileNum;
             std::tie(files_oxts, fileNum) = loadFile(oxtsPath, VERBOSE);
-            std::tie(files_lidar, fileNum) = loadFile(lidarPath, VERBOSE);
+            //std::tie(files_lidar, fileNum) = loadFile(lidarPath, VERBOSE);
 
             std::vector<Oxts_Data> oxts_data;
             auto timer_oxts = std::chrono::system_clock::now();
@@ -79,7 +79,12 @@ int32_t main(int32_t argc, char **argv) {
                 cluon::data::TimeStamp sampleTime{cluon::time::now()};
                 auto oxts_reading = oxts_data[NUM];
 
-                
+                // Load pointcloud
+                //auto timer_PCD = std::chrono::system_clock::now();
+                //auto cloud = loadKitti(files_lidar, NUM);
+                //std::string filename("/tmp/mytmpfs/test.pcd");
+                //pcl::PCDWriter writer;
+                //writer.write(filename,*cloud);
 
                 opendlv::logic::sensation::Geolocation geolocation;
                 geolocation.latitude((float)oxts_reading.lat);            

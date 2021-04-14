@@ -2,7 +2,7 @@
 #define KITTI_REPLAY_HPP
 
 #include <iostream>
-//#include <fstream>
+#include <fstream>
 #include <thread>
 #include <cstdint>
 #include <cstdlib>
@@ -10,6 +10,13 @@
 #include <cstring>
 #include <dirent.h>
 #include <string>
+
+// PCL Library
+#include <pcl/point_types.h>
+#include <pcl/ModelCoefficients.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/common/common.h>
+#include <pcl/point_types.h>
 
 class Oxts_Data{
     public:
@@ -43,6 +50,7 @@ class Oxts_Data{
         double wu; // angular rate around upward axis [rad/s]
 };
 
+// Load KITTI point cloud data
 std::tuple<std::vector<std::string>, int16_t> 
  loadFile (const std::string &folderPath, bool VERBOSE){
     // Count the total number of files in the path and return the path of all files.
@@ -91,6 +99,30 @@ Oxts_Data
     }
     else
         std::cout << "Unable to load file ..." << std::endl;
+}
+
+pcl::PointCloud<pcl::PointXYZ>::Ptr
+ loadKitti (const std::vector<std::string> &filePaths, 
+                          const int16_t &NUM){
+    pcl::PointCloud<pcl::PointXYZI>::Ptr points (new pcl::PointCloud<pcl::PointXYZI>);
+    typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+    std::fstream input(filePaths[NUM].c_str(), std::ios::in | std::ios::binary);
+    if(!input.good()){
+		std::cerr << "Could not read file: " << filePaths[NUM] << std::endl;
+		exit(EXIT_FAILURE);
+	}
+	input.seekg(0, std::ios::beg);
+    int i;
+	for (i=0; input.good() && !input.eof(); i++) {
+		pcl::PointXYZI point;
+		input.read((char *) &point.x, 3*sizeof(float));
+		input.read((char *) &point.intensity, sizeof(float));
+		points->push_back(point);
+	}
+	input.close();
+    pcl::copyPointCloud(*points, *cloud);
+    //std::cout << "Load file: [" << filePaths[NUM] << "]." << std::endl;
+    return cloud;
 }
 
 void 

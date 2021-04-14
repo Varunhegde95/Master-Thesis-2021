@@ -15,6 +15,7 @@
 
 # Part to build opendlv-kitti-replay.
 FROM ubuntu:18.04 as builder
+ENV DEBIAN_FRONTEND=noninteractive
 MAINTAINER Liangyu Wang "liangyu@student.chalmers.se"
 RUN apt-get update -y && \
     apt-get upgrade -y && \
@@ -22,6 +23,12 @@ RUN apt-get update -y && \
     cmake \
     build-essential \
     software-properties-common
+
+RUN apt-get update
+RUN apt-get install -y libeigen3-dev \
+    libflann-dev \
+    libboost-all-dev \
+    libpcl-dev
 
 RUN add-apt-repository -y ppa:chrberger/libcluon
 RUN apt-get update
@@ -36,8 +43,14 @@ RUN mkdir build && \
 
 # Part to deploy opendlv-kitti-replay
 FROM ubuntu:18.04
-MAINTAINER Liangyu Wang "liangyu@student.chalmers.se"
 ENV DEBIAN_FRONTEND=noninteractive
+MAINTAINER Liangyu Wang "liangyu@student.chalmers.se"
+
+RUN apt-get update
+RUN apt-get install -y libeigen3-dev \
+    libflann-dev \
+    libboost-all-dev \
+    libpcl-dev
 
 WORKDIR /usr/bin
 COPY --from=builder /tmp/dest /usr
