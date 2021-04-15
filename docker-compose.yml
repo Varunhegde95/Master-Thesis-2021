@@ -1,11 +1,4 @@
 version: "2.3"
-#volumes:
-#    shared-tmpfs:
-#      driver: local
-#      driver_opts:
-#        type: "tmpfs"
-#        device: "tmpfs"
-#        o: "size=256m,uid=1000"
 services:
     kitti-replay:
         container_name: kitti-replay
@@ -65,5 +58,4 @@ services:
         volumes:
         - ${HOME}/Learning_PCL/Test_data/2011_09_26/2011_09_26_drive_0117_sync:/opt/recordings
         - /tmp:/tmp
-        - /tmp/.X11-unix:/tmp/.X11-unix:rw
         command: "--cid=111 --freq=10 --name=video0.argb /opt/recordings/ --display --verbose"

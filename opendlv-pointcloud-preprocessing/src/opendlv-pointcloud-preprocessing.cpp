@@ -40,10 +40,11 @@ int32_t main(int32_t argc, char **argv) {
             ? static_cast<uint32_t>(std::stoi(commandlineArguments["id-sender"])) : 0};
 
         Filters<pcl::PointXYZ> filter;
+        Segmentation<pcl::PointXYZ> segmentation;
         Visual<pcl::PointXYZ> visual;
         pcl::visualization::PCLVisualizer viewer("PCD Viewer"); // Initialize PCD viewer
-        CameraAngle camera_angle = TOP; // Set camera angle
-        initCamera(viewer, BLACK, camera_angle); // Init viewer
+        CameraAngle camera_angle = TOP; // Set viewercamera angle
+        visual.initCamera(viewer, BLACK, camera_angle); // Initialize PCL viewer
 
         // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
@@ -75,7 +76,8 @@ int32_t main(int32_t argc, char **argv) {
         od4.dataTrigger(opendlv::logic::sensation::Geolocation::ID(), onGpsReading);
 
         int16_t NUM = 0;
-        auto atFrequency{[&DISPLAY, &VERBOSE, &od4, &lon, &lat, &files_lidar, &filter, &visual, &viewer, &IDSENDER, &NUM]() -> bool{
+        auto atFrequency{[&DISPLAY, &VERBOSE, &od4, &lon, &lat, &files_lidar, &filter, &segmentation, &visual, &viewer, &IDSENDER, &NUM]() -> bool{
+            auto frame_timer = std::chrono::system_clock::now();
             if(lon == 0 && lat == 0){
                 NUM = 0;
                 std::cout << "Waiting to receive data ..." << std::endl;
@@ -84,20 +86,50 @@ int32_t main(int32_t argc, char **argv) {
                 if(DISPLAY == true){ 
                     viewer.removeAllPointClouds(); // Clear viewer
                 }   
+                if(NUM == 0){ // First Frame
+
+                }
                 auto cloud = loadKitti(files_lidar, NUM);
-                // auto cloud_down = filter.VoxelGridDownSampling(cloud, 0.3f);// DownSampling
+
+                /*------ 1. Down Sampling ------*/
+                //auto timer_voxel = std::chrono::system_clock::now();
+                auto cloud_down = filter.VoxelGridDownSampling(cloud, 0.4f);
+                //timerCalculator(timer_voxel, "Voxel DownSampling"); // Voxel down sampling time
+
+                /*------ 2. Crop Box Filter [Remove roof] ------*/
+                const Eigen::Vector4f roof_min(-1.5, -1.7, -1, 1);
+                const Eigen::Vector4f roof_max(2.6, 1.7, -0.4, 1);
+                cloud_down = filter.boxFilter(cloud_down, roof_min, roof_max, true); // Remove roof outliers
+
+                /*------ 3. Statistical Outlier Removal ------*/
+                //auto timer_outlier = std::chrono::system_clock::now(); // Start timer
+                cloud_down = filter.StatisticalOutlierRemoval(cloud_down, 30, 2.0);
+                //timerCalculator(timer_outlier, "Outlier Removal");   // Took around 80-90 ms
+
+                /*------ 4. Plane Segmentation ------*/
+                const float SENSOR_HEIGHT = 2;
+                std::sort(cloud_down->points.begin(),cloud_down->points.end(),point_cmp); // Resort points in Z axis
+                auto cloud_down_sorted = filter.PassThroughFilter(cloud_down, "z", std::array<float, 2> {-SENSOR_HEIGHT-0.3, 1.0f}); // 'Z' Pass filter
+                auto RoughGroundPoints = segmentation.RoughGroundExtraction(cloud_down, 1.0, 60);
+                // RANSAC Segmentation
+                pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_road(new pcl::PointCloud<pcl::PointXYZ>());
+                pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_other(new pcl::PointCloud<pcl::PointXYZ>());
+                std::tie(cloud_road, cloud_other) = segmentation.PlaneSegmentationRANSAC(cloud_down, RoughGroundPoints, 150, 0.3);
+
 
 
                 if (VERBOSE){
                     std::cout << "Frame (" << NUM << ")" << std::endl;
+                    timerCalculator(frame_timer, "Every Frame");
                 }
                 /*------ Visualization ------*/
                 if(DISPLAY == true){
-                    viewer.addCoordinateSystem(1.0);
-                    visual.showPointcloud(viewer, cloud, 2, WHITE, "PCD");
-                    
+                    // visual.showPointcloud_height(viewer, cloud_down, 2, "PCD");
+                    visual.showPointcloud(viewer, cloud_road, 2, GREEN, "PCD road");
+                    visual.showPointcloud(viewer, cloud_other, 2, RED, "PCD other");
                 }
                 NUM ++;
+                viewer.spinOnce();
             }
         }};
 

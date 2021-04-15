@@ -23,15 +23,13 @@ RUN apt-get update -y && \
     cmake \
     git \
     build-essential \
-    software-properties-common \
-    libglm-dev
+    software-properties-common
 
 RUN apt-get update -y && \
     apt-get install -y libeigen3-dev \
     libflann-dev \
     libvtk6-qt-dev \
     libboost-all-dev \
-    libglew-dev \
     libpcl-dev
 
 RUN add-apt-repository -y ppa:chrberger/libcluon
@@ -55,10 +53,7 @@ RUN apt-get update -y && \
     libflann-dev \
     libvtk6-qt-dev \
     libboost-all-dev \
-    libpcl-dev \
-    libglm-dev \
-    libopengl0 \
-    libglew2.0
+    libpcl-dev 
     
 WORKDIR /usr/bin
 COPY --from=builder /tmp/dest /usr

@@ -141,27 +141,8 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr
 	}
 	input.close();
     pcl::copyPointCloud(*points, *cloud);
-    std::cout << "Load file: [" << filePaths[NUM] << "]." << std::endl;
+    // std::cout << "Load file: [" << filePaths[NUM] << "]." << std::endl;
     return cloud;
-}
-
-void 
- initCamera (pcl::visualization::PCLVisualizer &viewer,
-                           const Color &background_color, 
-                           const CameraAngle &camera_angle){
-	viewer.setBackgroundColor(background_color.R, background_color.G, background_color.B); // Set black background
-    viewer.initCameraParameters();
-    const int distance = 90;
-    if(camera_angle != FPS)
-        viewer.addCoordinateSystem(1.0);
-    switch(camera_angle) {
-        case TOP:
-        viewer.setCameraPosition(0, 0, distance, 1, 0, 1); break;
-        case SIDE:
-        viewer.setCameraPosition(0, -distance, 0, 0, 0, 1); break;
-        case FPS:
-        viewer.setCameraPosition(-10, 0, 0, 0, 0, 1); break;
-    }
 }
 
 /**
@@ -254,13 +235,11 @@ public:
 	**/
      typename pcl::PointCloud<PointT>::Ptr VoxelGridDownSampling( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
 																 const float &filterRes = 0.3f){
-		// pcl::PCLPointCloud2::Ptr cloud2(new pcl::PCLPointCloud2()); // Create pcl::...::Cloud2 object
 		typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
 		pcl::VoxelGrid<PointT> voxelFilter;
 		voxelFilter.setInputCloud(cloud); // Set input point cloud
 		voxelFilter.setLeafSize(filterRes, filterRes, filterRes); // Set voxel size
 		voxelFilter.filter(*cloud_filtered);
-		//pcl::fromPCLPointCloud2(*cloud2, *cloud_filtered); // PCLPointCloud2 ---> pcl::PointXYZ
 		std::cout << "[VoxelGridDownSampling]  Original points: " << cloud->width * cloud->height 
 				  <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
 		return cloud_filtered;
@@ -282,13 +261,111 @@ public:
 		sor.setInputCloud(cloud);
 		sor.setMeanK(meanK); 
 		sor.setStddevMulThresh(StddevMulThresh); 
-		// sor.setNegative(true);
 		sor.filter(*cloud_filtered);
 		std::cout << "[StatisticalOutlierRemoval] " << " Original points: " 
 				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
 		return cloud_filtered;
 	}  
+
 };
+
+/*-------------------------------------------------------------------------------------*/
+
+template<typename PointT>
+class Segmentation{
+public:
+    // Constructor
+    Segmentation() = default;
+
+    // Destructor
+    ~Segmentation() = default;
+
+	/**
+	 * @brief 
+	 * 
+	 * @param cloud Input point cloud
+	 * @param indices Indices of extracted points
+	 * @param set_negative Whether to reverse the selection
+	 * @return pcl::PointCloud<PointT>::Ptr 
+	 */
+	typename pcl::PointCloud<PointT>::Ptr 
+	 indicesExtract(const typename pcl::PointCloud<PointT>::Ptr &cloud, 
+									pcl::PointIndices::Ptr &indices,
+									const bool &set_negative = false){
+		typename pcl::PointCloud<PointT>::Ptr cloud_output(new pcl::PointCloud<PointT>());
+		pcl::ExtractIndices<PointT> ei;
+		ei.setInputCloud(cloud);
+		ei.setIndices(indices);
+		ei.setNegative(set_negative);
+		ei.filter(*cloud_output);
+		return cloud_output;
+	}
+
+	/**
+	 * @brief 
+	 * 
+	 * @param cloud Input point cloud
+	 * @param height_threshold Set height threshold to determine plane
+	 * @param min_number Set the minimum number of points, which are used to extract plane
+	 * @return pcl::PointCloud<PointT>::Ptr 
+	 */
+	typename pcl::PointCloud<PointT>::Ptr 
+	 RoughGroundExtraction (const typename pcl::PointCloud<PointT>::Ptr &cloud, 
+												  const float & height_threshold, 
+												  const int & min_number){
+		typename pcl::PointCloud<PointT>::Ptr cloud_output(new pcl::PointCloud<PointT>());
+		float sum = 0.0f; 
+		int num = 0;         
+		for(int i = 0; (i < cloud->points.size()) && (num < min_number); i++){
+			sum += cloud->points[i].z; 
+			num ++;
+		} 
+		// Calulate average point height
+		float average_height = num != 0 ? sum/num : 0;
+		for(int i = 0; i < cloud->points.size(); i++){
+			if(cloud->points[i].z < average_height + height_threshold)
+				cloud_output->points.push_back(cloud->points[i]);
+		}
+		return cloud_output;
+	}
+	
+	/**
+	 * @brief 
+	 * 
+	 * @param original_cloud 
+	 * @param rough_ground_cloud Segmentation input cloud
+	 * @param maxIterations Set maximum iteration of RANSAC
+	 * @param distanceThreshold Distance to the model threshold [unit: meter]
+	 * @return std::tuple<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> 
+	 */
+	std::tuple<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> 
+	 PlaneSegmentationRANSAC (const typename pcl::PointCloud<PointT>::Ptr &original_cloud, 
+											const typename pcl::PointCloud<PointT>::Ptr &rough_ground_cloud, 
+											const int &maxIterations, 
+											const float &distanceThreshold) {
+		pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
+		pcl::PointIndices::Ptr inliers (new pcl::PointIndices); // defeine plane inliers
+		pcl::SACSegmentation<PointT> seg;
+		seg.setOptimizeCoefficients (true);
+		seg.setModelType (pcl::SACMODEL_PLANE); // Set plane model
+		seg.setMethodType (pcl::SAC_RANSAC);    // Method: RANSAC
+		seg.setMaxIterations(maxIterations);    
+		seg.setDistanceThreshold (distanceThreshold); // unit [meter]
+		seg.setInputCloud (rough_ground_cloud); 
+		seg.segment (*inliers, *coefficients);
+		if (inliers->indices.size () == 0)
+			PCL_ERROR ("Could not estimate a planar model for the given dataset.");
+		typename pcl::PointCloud<PointT>::Ptr cloud_plane(new pcl::PointCloud<PointT>());
+		typename pcl::PointCloud<PointT>::Ptr cloud_other(new pcl::PointCloud<PointT>());
+		// Extract plane and non-plane cloud
+		cloud_plane = indicesExtract(original_cloud, inliers);
+		cloud_other = indicesExtract(original_cloud, inliers, true);
+		std::cout << "[RANSAC Plane Segmentation] Plane points: " << cloud_plane->points.size() << ", other points: " 
+				<< cloud_other->points.size() << std::endl;
+		return std::make_tuple(cloud_plane, cloud_other);
+	}
+};
+
 
 /*-------------------------------------------------------------------------------------*/
 
@@ -302,25 +379,64 @@ public:
     ~Visual() = default;
 
 	/**
-	 * @brief Point cloud visualization
+	 * @brief Initialize the PCL viewer, set background colorand camera angle
+	 * 
+	 * @param viewer Set PCL viewer
+	 * @param background_color Set viewer's background color, such as 'BLACK'
+	 * @param camera_angle Set viewer's camera angle, such as 'FPS'
+	 */
+	void initCamera (pcl::visualization::PCLVisualizer &viewer,
+					 const Color &background_color, 
+					 const CameraAngle &camera_angle){
+		viewer.setBackgroundColor(background_color.R, background_color.G, background_color.B); // Set black background
+		viewer.initCameraParameters();
+		const int distance = 90;
+		if(camera_angle != FPS)
+			viewer.addCoordinateSystem(1.0);
+		switch(camera_angle) {
+			case TOP:
+			viewer.setCameraPosition(0, 0, distance, 1, 0, 1); break;
+			case SIDE:
+			viewer.setCameraPosition(0, -distance, 0, 0, 0, 1); break;
+			case FPS:
+			viewer.setCameraPosition(-10, 0, 0, 0, 0, 1); break;
+		}
+	}
+
+	/**
+	 * @brief Point cloud visualization, color is changing based on height
 	 * 
 	 * @param viewer 
 	 * @param cloud Input point cloud
 	 * @param point_size Set point size in the viewer
-	 * @param color 
 	 * @param name Viewer's name
 	 */
-	void showPointcloud( pcl::visualization::PCLVisualizer &viewer, 
+	void showPointcloud_height( pcl::visualization::PCLVisualizer &viewer, 
                          typename pcl::PointCloud<PointT>::Ptr &cloud, 
                          const int &point_size,
-                         const Color &color, 
                          const std::string &name ){
-		//pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> cloud_color_h(cloud, color.R, color.G, color.B);
 		pcl::visualization::PointCloudColorHandlerGenericField<pcl::PointXYZ> fildColor(cloud, "z");
 		viewer.addPointCloud(cloud, fildColor, name);
 		viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, point_size, name);
-		//viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, color.R, color.G, color.B, name);
 	}
 
+	/**
+	 * @brief Point cloud visualization, manually set color
+	 * 
+	 * @param viewer 
+	 * @param cloud Input point cloud
+	 * @param point_size Set point size in the viewer
+	 * @param color Set point color
+	 * @param name Viewer's name
+	 */
+	void showPointcloud (pcl::visualization::PCLVisualizer &viewer, 
+                         typename pcl::PointCloud<PointT>::Ptr &cloud, 
+                         const int &point_size,
+                         const Color &color, 
+                         const std::string &name){
+    viewer.addPointCloud(cloud, name);
+    viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, point_size, name);
+    viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, color.R, color.G, color.B, name);
+	}
 };
 #endif /*PREPROCESSING_HPP*/
