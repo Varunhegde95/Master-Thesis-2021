@@ -86,37 +86,33 @@ int32_t main(int32_t argc, char **argv) {
                 if(DISPLAY == true){ 
                     viewer.removeAllPointClouds(); // Clear viewer
                 }   
-                if(NUM == 0){ // First Frame
-
-                }
                 auto cloud = loadKitti(files_lidar, NUM);
 
                 /*------ 1. Down Sampling ------*/
-                //auto timer_voxel = std::chrono::system_clock::now();
                 auto cloud_down = filter.VoxelGridDownSampling(cloud, 0.4f);
-                //timerCalculator(timer_voxel, "Voxel DownSampling"); // Voxel down sampling time
 
                 /*------ 2. Crop Box Filter [Remove roof] ------*/
+                // Distance Crop Box
+                const Eigen::Vector4f min_point(-40, -25, -3, 1);
+                const Eigen::Vector4f max_point(40, 25, 4, 1);
+                cloud_down = filter.boxFilter(cloud_down, min_point, max_point);
+
                 const Eigen::Vector4f roof_min(-1.5, -1.7, -1, 1);
                 const Eigen::Vector4f roof_max(2.6, 1.7, -0.4, 1);
                 cloud_down = filter.boxFilter(cloud_down, roof_min, roof_max, true); // Remove roof outliers
 
                 /*------ 3. Statistical Outlier Removal ------*/
-                //auto timer_outlier = std::chrono::system_clock::now(); // Start timer
                 cloud_down = filter.StatisticalOutlierRemoval(cloud_down, 30, 2.0);
-                //timerCalculator(timer_outlier, "Outlier Removal");   // Took around 80-90 ms
 
                 /*------ 4. Plane Segmentation ------*/
                 const float SENSOR_HEIGHT = 2;
                 std::sort(cloud_down->points.begin(),cloud_down->points.end(),point_cmp); // Resort points in Z axis
-                auto cloud_down_sorted = filter.PassThroughFilter(cloud_down, "z", std::array<float, 2> {-SENSOR_HEIGHT-0.3, 1.0f}); // 'Z' Pass filter
-                auto RoughGroundPoints = segmentation.RoughGroundExtraction(cloud_down, 1.0, 60);
+                auto cloud_down_sorted = filter.PassThroughFilter(cloud_down, "z", std::array<float, 2> {-SENSOR_HEIGHT-0.2, 0.5f}); // 'Z' Pass filter
+                auto RoughGroundPoints = segmentation.RoughGroundExtraction(cloud_down, 1.0, 70);
                 // RANSAC Segmentation
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_road(new pcl::PointCloud<pcl::PointXYZ>());
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_other(new pcl::PointCloud<pcl::PointXYZ>());
-                std::tie(cloud_road, cloud_other) = segmentation.PlaneSegmentationRANSAC(cloud_down, RoughGroundPoints, 150, 0.3);
-
-
+                std::tie(cloud_road, cloud_other) = segmentation.PlaneSegmentationRANSAC(cloud_down, RoughGroundPoints, 150, 0.2);
 
                 if (VERBOSE){
                     std::cout << "Frame (" << NUM << ")" << std::endl;
