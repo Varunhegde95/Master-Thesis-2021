@@ -1,6 +1,6 @@
 #ifndef UKF_HPP
 #define UKF_HPP
-/* \author Liangyu Wang & Varun Hegde*/
+/* \author Leo Wang & Varun Hegde*/
 // Customized functions for Unscented Kalman Filter
 // using Eigen 3
 
@@ -17,21 +17,20 @@
 #include <Eigen/Eigen>
 #include <Eigen/Dense>
 
+// GPS to cartesian
+#include "WGS84toCartesian.hpp"
+
 class Sensor_Reading{
     public:
         Sensor_Reading(){};
         float lat = 0;   // ** GPS ** latitude of the oxts  - unit [deg]    
         float lon = 0;   // ** GPS ** longitude of the oxts - unit [deg]
         float alt = 0;   // ** GPS ** altitude of the oxts  - unit [m]
-
         float yaw = 0;   // heading(rad), 0 = east, positive = counter clockwise, range : [-pi .. + pi]
-
-        float vf  = 0; // forward velocity, i.e.parallel to earth - surface [m/s]
-
+        float vf  = 0;   // forward velocity, i.e.parallel to earth - surface [m/s]
         float ax; // acceleration in x, i.e.in direction of vehicle front [m/s^2]
         float ay; // acceleration in y, i.e.in direction of vehicle left [m/s^2]
         float az; // acceleration in z, i.e.in direction of vehicle top [m/s^2]
-
         float wx; // angular rate around x [rad/s]
         float wy; // angular rate around y [rad/s]
         float wz; // angular rate around z [rad/s]
@@ -48,7 +47,10 @@ public:
       float mz_;  
       float ds_;
 
-      // Initialize Odometer
+      /**
+       * @brief  Initialize Odometer
+       * 
+       */
       void Initialize(){
          mx_ = 0.0f;
          my_ = 0.0f;
@@ -57,7 +59,12 @@ public:
          std::cout << "Initialize Odometer, "; 
       }
 
-      // Convert GPS data Latitude/Longitude/Altitude -> meters, update Odometer (mx, my, mz).
+      /** 
+       * @brief Convert GPS data Latitude/Longitude/Altitude -> meters, update Odometer (mx, my). 
+       * 
+       * @param sensor_reading_now Latest GPS data frame
+       * @param sensor_reading_pre Last GPS data frame
+       */
       void GPSConvertor(const Sensor_Reading &sensor_reading_now, const Sensor_Reading &sensor_reading_pre){
          float arc = 2.0 * M_PI * (float)(earthRadius_ + sensor_reading_now.alt)/360.0; 
          float dx  = arc * (float) cos(sensor_reading_now.lat * M_PI/180.0) * (sensor_reading_now.lon - sensor_reading_pre.lon); // [m]
@@ -68,6 +75,20 @@ public:
          //mz_ += dz;
          ds_ = sqrt(dx*dx + dy*dy); 
       }
+
+      // /**
+      //  * @brief Convert GPS data Latitude/Longitude/Altitude -> meters, update Odometer (mx, my). 
+      //  * 
+      //  * @param sensor_data_now Latest GPS data frame
+      //  * @param sensor_data_pre Last GPS data frame
+      //  */
+      // void GPSConvertorwgs84(const Sensor_Reading &sensor_data_now, const Sensor_Reading &sensor_data_pre){
+      //    std::array<double, 2>  wgs84_coord_ref = {(double) sensor_data_pre.lat, (double) sensor_data_pre.lon};
+      //    std::array<double, 2>  wgs84_coord_now = {(double) sensor_data_now.lat, (double) sensor_data_now.lon};
+      //    std::array<double, 2> wgs84local_coord = wgs84::toCartesian(wgs84_coord_ref, wgs84_coord_now);
+      //    mx_ += (float) wgs84local_coord[0];
+      //    my_ += (float) wgs84local_coord[1];
+      // }
 };
 
 class UKF
@@ -78,8 +99,6 @@ private:
 public:
    // sensor sampling rate 10 Hz 
    float dt_ = 0.1;
-   // Augmented state dimension
-   //const int num_aug_x_;
    // Sigma point spreading parameter
    const float lambda_ = 3 - num_x_;
    // Process Noise Covariance Matrix Q
@@ -110,9 +129,14 @@ public:
    // Measurement matrix
    Eigen::Matrix<float, 8, 1> measurements_;
 
-   // Set process noise covariance matrix Q [10, 10]
-   void 
-    SetProcessNoiseCovatiance(const float &sGPS, const float &sCourse, 
+   /**
+    * @brief Set process noise covariance matrix Q [10, 10]
+    * 
+    * @param sGPS GPS noise covariance
+    * @param sCourse Turn angle noise covariance
+    * @param sTurnRate Turn rate noise covariance
+    */
+   void SetProcessNoiseCovatiance(const float &sGPS, const float &sCourse, 
                                     const float &sTurnRate){
       Eigen::Matrix<float, 10, 10> i(Eigen::MatrixXf::Identity(10, 10));  
       Eigen::DiagonalMatrix<float, 10> m;
@@ -124,9 +148,15 @@ public:
       Q_ = i * m;
    }
 
-   // Set measurement noise covariance R [8, 8]
-   void 
-    SetMeasureNoiseCovatiance(const float &var_GPS, const float &var_speed, const float &var_course, const float &var_turn_angle){
+   /**
+    * @brief Set measurement noise covariance R [8, 8]
+    * 
+    * @param var_GPS 
+    * @param var_speed 
+    * @param var_course 
+    * @param var_turn_angle 
+    */
+   void SetMeasureNoiseCovatiance(const float &var_GPS, const float &var_speed, const float &var_course, const float &var_turn_angle){
       Eigen::Matrix<float, 8, 8> i(Eigen::MatrixXf::Identity(8, 8));  
       Eigen::DiagonalMatrix<float, 8> m;
       m.diagonal() << var_GPS * var_GPS, var_GPS * var_GPS, var_GPS * var_GPS, var_speed * var_speed, var_course * var_course,
@@ -134,16 +164,22 @@ public:
       R_ = i * m;
    }
 
-   // Set initial uncertainty P0 [15, 15]
-   void 
-    SetInitialCovariance(){
+   /**
+    * @brief Set initial uncertainty P0 [15, 15]
+    * 
+    */
+   void SetInitialCovariance(){
       Eigen::Matrix<float, 15, 15> i(Eigen::MatrixXf::Identity(15, 15));  
       P0_ = i * 1000.0;
    }
 
-   // Initialize State: Q, R, P0, x_f_ = X0,  p_f_ = P0 
-   void 
-    Initialize(const Odometer &odom, const Sensor_Reading &sensor_reading){
+   /**
+    * @brief Initialize State: Q, R, P0, x_f_ = X0,  p_f_ = P0 
+    * 
+    * @param odom Odometer data
+    * @param sensor_reading Sensor data
+    */
+   void Initialize(const Odometer &odom, const Sensor_Reading &sensor_reading){
       x_p_ = Eigen::MatrixXf::Zero(10,1);
       p_p_ = Eigen::MatrixXf::Zero(10,10);
       measurements_ = Eigen::MatrixXf::Zero(8, 1);
@@ -157,9 +193,13 @@ public:
       std::cout << "Initialize UKF" << std::endl;
    }
 
-   // Generate Sigma Points and sigma point Weights
-   void 
-    GenerateSigmaPoints(const Eigen::MatrixXf &x, const Eigen::MatrixXf &P){
+   /**
+    * @brief  Generate Sigma Points and sigma point Weights
+    * 
+    * @param x Filtered state
+    * @param P Filtered covariance
+    */
+   void GenerateSigmaPoints(const Eigen::MatrixXf &x, const Eigen::MatrixXf &P){
       SP_.fill(0.0);
       W_.fill(0.0);
       SP_.col(0) = x; 
@@ -173,22 +213,27 @@ public:
       W_(0) = (float) lambda_ / (num_x_ + lambda_);
    }
 
-   // Predict Sigma Points
-   void 
-    PredictSigmaPoints(const Eigen::MatrixXf &SP, const Eigen::MatrixXf &W, const float &dt){
+   /**
+    * @brief Predict Sigma Points. Choose between CTRV and CV motion model based on the yaw rate.
+    * 
+    * @param SP Sigma points
+    * @param W Sigma point weights
+    * @param dt Time interval 
+    */
+   void PredictSigmaPoints(const Eigen::MatrixXf &SP, const Eigen::MatrixXf &W, const float &dt){
       x_p_.fill(0.0); // Initialize Predicted State Mean
       p_p_ = Q_; // Initialize Predicted State Covariance
       for(int i = 0; i < 2 * num_x_ + 1; i++){
-         float p_x(SP(0, i)); // pos x
-         float p_y(SP(1, i)); // pos y
-         float p_z(SP(2, i)); // pos z
-         float v  (SP(3, i)); // Speed
+         float p_x(SP(0, i));    // pos x
+         float p_y(SP(1, i));    // pos y
+         float p_z(SP(2, i));    // pos z
+         float v  (SP(3, i));    // Speed
          float pitch(SP(4, i));  // Pitch
          float roll (SP(5, i));  // Roll
          float yaw  (SP(6, i));  // Yaw
-         float pitch_rate(SP(7, i)); // Pitch Rate
-         float roll_rate (SP(8, i)); // Roll Rate
-         float yaw_rate  (SP(9, i)); // Yaw Rate
+         float pitch_rate(SP(7, i));   // Pitch Rate
+         float roll_rate (SP(8, i));   // Roll Rate
+         float yaw_rate  (SP(9, i));   // Yaw Rate
          float gamma_acc  (SP(10, i)); // Gamma_Acceleration
          float gamma_pitch(SP(11, i)); // Gamma_Pitch
          float gamma_roll (SP(12, i)); // Gamma_Roll
@@ -229,22 +274,38 @@ public:
       }
    }
 
-   // Predict state vector and covariance
-   void 
-    Prediction(const Eigen::MatrixXf &x, const Eigen::MatrixXf &P){
+   /**
+    * @brief Predict state vector and covariance
+    * 
+    * @param x Filtered state
+    * @param P Filtered covariance
+    */
+   void Prediction(const Eigen::MatrixXf &x, const Eigen::MatrixXf &P){
       GenerateSigmaPoints(x, P);
       PredictSigmaPoints(SP_, W_, dt_);
    }
 
-   // Read sensor data and save to 'measurement_' matrix [7x1]
-   void 
-    GetMeasurement(const Odometer &odom, const Sensor_Reading &sensor_reading){
-       measurements_ << odom.mx_, odom.my_, odom.mz_, sensor_reading.vf, sensor_reading.yaw, sensor_reading.wy/180*M_PI, sensor_reading.wx/180*M_PI, sensor_reading.wz/180*M_PI;
+   /**
+    * @brief Read sensor data and save to 'measurement_' matrix [7x1]
+    * 
+    * @param odom Odometer data
+    * @param sensor_reading Sensor data
+    */
+   void GetMeasurement(const Odometer &odom, const Sensor_Reading &sensor_reading){
+      measurements_ << odom.mx_, odom.my_, odom.mz_, sensor_reading.vf, sensor_reading.yaw, 
+         sensor_reading.wy/180*M_PI, sensor_reading.wx/180*M_PI, sensor_reading.wz/180*M_PI;
    }
 
-   void 
-    Update(const Eigen::MatrixXf &x, const Eigen::MatrixXf &P, 
-           const Eigen::MatrixXf &measure, const Odometer &odom){
+   /**
+    * @brief UKF Update step
+    * 
+    * @param x Predicted state from 'Prediction' step
+    * @param P Predicted covariance from 'Prediction' step
+    * @param measure Measurement for updating
+    * @param odom Odometer for updating
+    */
+   void Update(const Eigen::MatrixXf &x, const Eigen::MatrixXf &P, 
+               const Eigen::MatrixXf &measure, const Odometer &odom){
       // Generate Update Sigma Points 
       int lambda = 3 - P.rows();
       SP_U_.col(0) = x; 
@@ -295,7 +356,7 @@ public:
             y_hat(1) += SP_U_(1, i) * W_U_(i); // Position Y
             y_hat(2) += SP_U_(2, i) * W_U_(i); // Position Z
             y_hat(3) += SP_U_(3, i) * W_U_(i); // Speed V
-            y_hat(4) += SP_U_(6, i) * W_U_(i); // Yaw
+            y_hat(4) += SP_U_(6, i) * W_U_(i); // Yaw angle
             y_hat(5) += SP_U_(7, i) * W_U_(i); // Pitch Rate
             y_hat(6) += SP_U_(8, i) * W_U_(i); // Roll Rate
             y_hat(7) += SP_U_(9, i) * W_U_(i); // Yaw Rate
@@ -320,9 +381,15 @@ public:
    }
 };
 
-void 
- timerCalculator (const std::chrono::_V2::system_clock::time_point &start_time,
-                                const std::string &function){
+/**
+ * @brief Calculate the time consumption. 
+ * Have to use "auto start_time = std::chrono::system_clock::now()" to start timer.
+ * 
+ * @param start_time Choose starting Timer
+ * @param function_name Function name shown in terminal
+ */
+void timerCalculator (const std::chrono::_V2::system_clock::time_point &start_time,
+                      const std::string &function){
     // Should use "auto start_fast = std::chrono::system_clock::now()" to start timer.
     auto end_time = std::chrono::system_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
