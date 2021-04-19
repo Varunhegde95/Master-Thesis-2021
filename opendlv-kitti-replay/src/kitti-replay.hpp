@@ -50,7 +50,13 @@ class Oxts_Data{
         double wu; // angular rate around upward axis [rad/s]
 };
 
-// Load KITTI point cloud data
+/**
+ * @brief Load KITTI point cloud data file path
+ * 
+ * @param folderPath KITTI data folder path
+ * @param VERBOSE Whether to show in terminal
+ * @return File paths and total numbers 
+ */
 std::tuple<std::vector<std::string>, int16_t> 
  loadFile (const std::string &folderPath, bool VERBOSE){
     // Count the total number of files in the path and return the path of all files.
@@ -78,6 +84,13 @@ std::tuple<std::vector<std::string>, int16_t>
     return std::make_tuple(filePaths, count);
 }
 
+/**
+ * @brief Load KITTI IMU & GPS data from oxts folder
+ * 
+ * @param filePaths oxts file path
+ * @param NUM Load file[NUM] in the file path
+ * @return Oxts_Data 
+ */
 Oxts_Data
  loadOxts (const std::vector<std::string> &filePaths, 
                    const int16_t &NUM){
@@ -125,6 +138,12 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr
     return cloud;
 }
 
+/**
+ * @brief Calculate time consumption
+ * 
+ * @param start_time Initialize the timer start time 
+ * @param function Function name to print
+ */
 void 
  timerCalculator (const std::chrono::_V2::system_clock::time_point &start_time,
                                 const std::string &function){

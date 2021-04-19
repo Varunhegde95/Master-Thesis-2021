@@ -17,9 +17,6 @@
 #include <Eigen/Eigen>
 #include <Eigen/Dense>
 
-// GPS to cartesian
-#include "WGS84toCartesian.hpp"
-
 class Sensor_Reading{
     public:
         Sensor_Reading(){};
@@ -75,20 +72,6 @@ public:
          //mz_ += dz;
          ds_ = sqrt(dx*dx + dy*dy); 
       }
-
-      // /**
-      //  * @brief Convert GPS data Latitude/Longitude/Altitude -> meters, update Odometer (mx, my). 
-      //  * 
-      //  * @param sensor_data_now Latest GPS data frame
-      //  * @param sensor_data_pre Last GPS data frame
-      //  */
-      // void GPSConvertorwgs84(const Sensor_Reading &sensor_data_now, const Sensor_Reading &sensor_data_pre){
-      //    std::array<double, 2>  wgs84_coord_ref = {(double) sensor_data_pre.lat, (double) sensor_data_pre.lon};
-      //    std::array<double, 2>  wgs84_coord_now = {(double) sensor_data_now.lat, (double) sensor_data_now.lon};
-      //    std::array<double, 2> wgs84local_coord = wgs84::toCartesian(wgs84_coord_ref, wgs84_coord_now);
-      //    mx_ += (float) wgs84local_coord[0];
-      //    my_ += (float) wgs84local_coord[1];
-      // }
 };
 
 class UKF

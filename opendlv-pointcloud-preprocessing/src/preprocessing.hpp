@@ -149,7 +149,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr
  * @brief Calculate the time consumption. 
  * Have to use "auto start_time = std::chrono::system_clock::now()" to start timer.
  * 
- * @param start_time 
+ * @param start_time Choose starting Timer
  * @param function_name Function name shown in terminal
  */
 void 

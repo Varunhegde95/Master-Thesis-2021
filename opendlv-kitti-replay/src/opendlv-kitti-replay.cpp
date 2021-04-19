@@ -42,8 +42,6 @@ int32_t main(int32_t argc, char **argv) {
         // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
 
-        //std::unique_ptr<cluon::SharedMemory> sharedMemory(nullptr);
-
         std::string kittiPath;
         for (auto e : commandlineArguments) {
             if (e.second.empty() && e.first != PROGRAM) {
@@ -78,13 +76,6 @@ int32_t main(int32_t argc, char **argv) {
             auto atFrequency{[&VERBOSE, &od4, &oxts_data, &IDSENDER, &NUM]() -> bool{
                 cluon::data::TimeStamp sampleTime{cluon::time::now()};
                 auto oxts_reading = oxts_data[NUM];
-
-                // Load pointcloud
-                //auto timer_PCD = std::chrono::system_clock::now();
-                //auto cloud = loadKitti(files_lidar, NUM);
-                //std::string filename("/tmp/mytmpfs/test.pcd");
-                //pcl::PCDWriter writer;
-                //writer.write(filename,*cloud);
 
                 opendlv::logic::sensation::Geolocation geolocation;
                 geolocation.latitude((float)oxts_reading.lat);            

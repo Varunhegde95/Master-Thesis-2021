@@ -56,7 +56,6 @@ int32_t main(int32_t argc, char **argv) {
         std::mutex GyroReadingMutex;      // IMU Gyroscope Reading Mutex
 
         Sensor_Reading sensor_reading;
-        //Sensor_Reading sensor_reading_now; // Used in UKF
         Sensor_Reading sensor_reading_pre; // Used in UKF
 
         auto onGpsReading{[&GpsReadingMutex, &sensor_reading](cluon::data::Envelope &&envelope) {

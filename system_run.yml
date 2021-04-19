@@ -2,10 +2,7 @@ version: "2.3"
 services:
     kitti-replay:
         container_name: kitti-replay
-        build:
-            context: ./opendlv-kitti-replay
-            dockerfile: Dockerfile
-        image: opendlv-kitti-replay:v0.1
+        image: leowang1997/opendlv-kitti-replay:v0.1
         restart: on-failure
         network_mode: "host"
         ipc: "host"
@@ -17,10 +14,7 @@ services:
     
     unscented-kalman-filter:
         container_name: unscented-kalman-filter
-        build:
-            context: ./opendlv-unscented-kalman-filter
-            dockerfile: Dockerfile
-        image: opendlv-unscented-kalman-filter:v0.1
+        image: leowang1997/opendlv-unscented-kalman-filter:v0.1
         ipc: "host"
         network_mode: "host"
         depends_on:
@@ -29,10 +23,7 @@ services:
 
     map-plotter:
         container_name: map-plotter
-        build:
-            context: ./opendlv-map-plotter
-            dockerfile: Dockerfile
-        image: opendlv-map-plotter:v0.1
+        image: leowang1997/opendlv-map-plotter:v0.1
         network_mode: "host"
         environment:
         - DISPLAY=${DISPLAY}
@@ -42,10 +33,7 @@ services:
 
     pointcloud_processing:
         container_name: pointcloud_processing
-        build:
-            context: ./opendlv-pointcloud-preprocessing
-            dockerfile: Dockerfile
-        image: opendlv-pointcloud-preprocessing:v0.1
+        image: leowang1997/opendlv-pointcloud-preprocessing:v0.1
         runtime: nvidia
         ipc: "host"
         network_mode: "host"
