@@ -48,7 +48,7 @@
 // Visualization
 #include <pcl/visualization/pcl_visualizer.h>
 
-#define RED Color(0.6, 0, 0)
+#define RED    Color(0.6, 0, 0)
 #define GREEN  Color(0.235, 0.702, 0.443)
 #define BLUE   Color(0.4, 0.698, 1)
 #define VIOLET Color(0.933, 0.510, 0.933)
@@ -330,19 +330,19 @@ public:
 	}
 	
 	/**
-	 * @brief 
+	 * @brief Plane Segmentation using RANSAC
 	 * 
 	 * @param original_cloud 
-	 * @param rough_ground_cloud Segmentation input cloud
+	 * @param rough_ground_cloud Rough ground input cloud based on heihgt
 	 * @param maxIterations Set maximum iteration of RANSAC
 	 * @param distanceThreshold Distance to the model threshold [unit: meter]
 	 * @return std::tuple<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> 
 	 */
 	std::tuple<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> 
 	 PlaneSegmentationRANSAC (const typename pcl::PointCloud<PointT>::Ptr &original_cloud, 
-											const typename pcl::PointCloud<PointT>::Ptr &rough_ground_cloud, 
-											const int &maxIterations, 
-											const float &distanceThreshold) {
+							  const typename pcl::PointCloud<PointT>::Ptr &rough_ground_cloud, 
+							  const int &maxIterations, 
+							  const float &distanceThreshold) {
 		pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
 		pcl::PointIndices::Ptr inliers (new pcl::PointIndices); // defeine plane inliers
 		pcl::SACSegmentation<PointT> seg;
@@ -362,6 +362,69 @@ public:
 		cloud_other = indicesExtract(original_cloud, inliers, true);
 		std::cout << "[RANSAC Plane Segmentation] Plane points: " << cloud_plane->points.size() << ", other points: " 
 				<< cloud_other->points.size() << std::endl;
+		return std::make_tuple(cloud_plane, cloud_other);
+	}
+
+	std::tuple<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> 
+	 PlaneEstimation(const typename pcl::PointCloud<PointT>::Ptr &original_cloud, 
+					 const typename pcl::PointCloud<PointT>::Ptr &rough_ground_cloud,
+					 const float &d_threshold = 0.3f) {
+		float x_mean = 0, y_mean = 0, z_mean = 0; 
+		float distance_threshold = d_threshold;
+		for(int i=0; i<rough_ground_cloud->points.size(); i++){
+			x_mean += rough_ground_cloud->points[i].x;
+			y_mean += rough_ground_cloud->points[i].y;
+			z_mean += rough_ground_cloud->points[i].z;
+		}
+		// Calculate mean X, Y, Z
+		int size = rough_ground_cloud->points.size()!=0 ? rough_ground_cloud->points.size():1;
+		x_mean /= size;
+		y_mean /= size;
+		z_mean /= size;
+		// Calculate covariance
+		float xx = 0, yy = 0, zz = 0;
+		float xy = 0, xz = 0, yz = 0;
+		for(int i=0;i<rough_ground_cloud->points.size();i++){
+			xx += (rough_ground_cloud->points[i].x-x_mean)*(rough_ground_cloud->points[i].x-x_mean);
+			xy += (rough_ground_cloud->points[i].x-x_mean)*(rough_ground_cloud->points[i].y-y_mean);
+			xz += (rough_ground_cloud->points[i].x-x_mean)*(rough_ground_cloud->points[i].z-z_mean);
+			yy += (rough_ground_cloud->points[i].y-y_mean)*(rough_ground_cloud->points[i].y-y_mean);
+			yz += (rough_ground_cloud->points[i].y-y_mean)*(rough_ground_cloud->points[i].z-z_mean);
+			zz += (rough_ground_cloud->points[i].z-z_mean)*(rough_ground_cloud->points[i].z-z_mean);
+		}
+		// Calculate covariance matrix
+		Eigen::MatrixXf cov(3,3);
+		cov << xx,xy,xz,
+			   xy, yy, yz,
+			   xz, yz, zz;
+		cov /= size;
+		// Singular Value Decomposition: SVD
+    	Eigen::JacobiSVD<Eigen::MatrixXf> svd(cov,Eigen::DecompositionOptions::ComputeFullU);
+		Eigen::MatrixXf normal = (svd.matrixU().col(2));
+		Eigen::MatrixXf seeds_mean(3,1); // mean ground seeds value
+		seeds_mean << x_mean, y_mean, z_mean;
+		float d = -(normal.transpose()*seeds_mean)(0,0);
+		distance_threshold = distance_threshold - d; // Update Distance threshold
+
+		// Pointcloud --> Matrix
+		Eigen::MatrixXf points(original_cloud->points.size(),3);
+		int j = 0;
+		for(auto p : original_cloud->points){
+			points.row(j++) << p.x, p.y, p.z;
+		}
+		// Ground plane model
+		Eigen::VectorXf result = points*normal;
+		// Road plane threshold filter
+		typename pcl::PointCloud<PointT>::Ptr cloud_plane(new pcl::PointCloud<PointT>());
+		typename pcl::PointCloud<PointT>::Ptr cloud_other(new pcl::PointCloud<PointT>());
+		for(int i = 0; i < result.rows(); i++){
+			if(result[i] < distance_threshold){
+				cloud_plane -> points.push_back(original_cloud->points[i]);
+			}
+			else{
+				cloud_other -> points.push_back(original_cloud->points[i]);
+			}
+		}
 		return std::make_tuple(cloud_plane, cloud_other);
 	}
 };
