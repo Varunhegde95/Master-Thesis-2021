@@ -89,7 +89,7 @@ int32_t main(int32_t argc, char **argv) {
                 auto cloud = loadKitti(files_lidar, NUM);
 
                 /*------ 1. Down Sampling ------*/
-                auto cloud_down = filter.VoxelGridDownSampling(cloud, 0.4f);
+                auto cloud_down = filter.VoxelGridDownSampling(cloud, 0.5f);
 
                 /*------ 2. Crop Box Filter [Remove roof] ------*/
                 // Distance Crop Box
@@ -105,15 +105,18 @@ int32_t main(int32_t argc, char **argv) {
                 cloud_down = filter.StatisticalOutlierRemoval(cloud_down, 30, 2.0);
 
                 /*------ 4. Plane Segmentation ------*/
+                // Rough gournd extraction
+                auto timer_plane = std::chrono::system_clock::now();
                 const float SENSOR_HEIGHT = 2;
                 std::sort(cloud_down->points.begin(),cloud_down->points.end(),point_cmp); // Resort points in Z axis
                 auto cloud_down_sorted = filter.PassThroughFilter(cloud_down, "z", std::array<float, 2> {-SENSOR_HEIGHT-0.2, 0.5f}); // 'Z' Pass filter
                 auto RoughGroundPoints = segmentation.RoughGroundExtraction(cloud_down, 1.0, 70);
-                // RANSAC Segmentation
+                // Fine ground plane segmentation
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_road(new pcl::PointCloud<pcl::PointXYZ>());
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_other(new pcl::PointCloud<pcl::PointXYZ>());
                 // std::tie(cloud_road, cloud_other) = segmentation.PlaneSegmentationRANSAC(cloud_down, RoughGroundPoints, 150, 0.2);
-                std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.3f);
+                std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.5f);
+                timerCalculator(timer_plane, "Plane Segmentation");
 
                 if (VERBOSE){
                     std::cout << "Frame (" << NUM << ")" << std::endl;
@@ -122,7 +125,7 @@ int32_t main(int32_t argc, char **argv) {
                 /*------ Visualization ------*/
                 if(DISPLAY == true){
                     // visual.showPointcloud_height(viewer, cloud_down, 2, "PCD");
-                    visual.showPointcloud(viewer, cloud_road, 2, GREEN, "PCD road");
+                    // visual.showPointcloud(viewer, cloud_road, 2, GREEN, "PCD road");
                     visual.showPointcloud(viewer, cloud_other, 2, RED, "PCD other");
                 }
                 NUM ++;

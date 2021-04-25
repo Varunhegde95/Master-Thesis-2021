@@ -302,9 +302,9 @@ public:
 	}
 
 	/**
-	 * @brief 
+	 * @brief Extract rough ground plane according to the points height
 	 * 
-	 * @param cloud Input point cloud
+	 * @param cloud Z-axis Sorted point cloud
 	 * @param height_threshold Set height threshold to determine plane
 	 * @param min_number Set the minimum number of points, which are used to extract plane
 	 * @return pcl::PointCloud<PointT>::Ptr 
@@ -365,6 +365,14 @@ public:
 		return std::make_tuple(cloud_plane, cloud_other);
 	}
 
+	/**
+	 * @brief Plane Segmentation using SVD
+	 * 
+	 * @param original_cloud 
+	 * @param rough_ground_cloud 
+	 * @param d_threshold 
+	 * @return std::tuple<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> 
+	 */
 	std::tuple<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> 
 	 PlaneEstimation(const typename pcl::PointCloud<PointT>::Ptr &original_cloud, 
 					 const typename pcl::PointCloud<PointT>::Ptr &rough_ground_cloud,
@@ -393,27 +401,27 @@ public:
 			zz += (rough_ground_cloud->points[i].z-z_mean)*(rough_ground_cloud->points[i].z-z_mean);
 		}
 		// Calculate covariance matrix
-		Eigen::MatrixXf cov(3,3);
+		Eigen::Matrix<float, 3, 3> cov;
 		cov << xx,xy,xz,
 			   xy, yy, yz,
 			   xz, yz, zz;
 		cov /= size;
 		// Singular Value Decomposition: SVD
     	Eigen::JacobiSVD<Eigen::MatrixXf> svd(cov,Eigen::DecompositionOptions::ComputeFullU);
-		Eigen::MatrixXf normal = (svd.matrixU().col(2));
-		Eigen::MatrixXf seeds_mean(3,1); // mean ground seeds value
+		Eigen::Matrix<float, 3, 1> normal = (svd.matrixU().col(2));
+		Eigen::Matrix<float, 3, 1> seeds_mean; // mean ground seeds value
 		seeds_mean << x_mean, y_mean, z_mean;
 		float d = -(normal.transpose()*seeds_mean)(0,0);
 		distance_threshold = distance_threshold - d; // Update Distance threshold
 
 		// Pointcloud --> Matrix
-		Eigen::MatrixXf points(original_cloud->points.size(),3);
+		Eigen::MatrixXf points(original_cloud -> points.size(),3);
 		int j = 0;
-		for(auto p : original_cloud->points){
+		for(auto p : original_cloud -> points){
 			points.row(j++) << p.x, p.y, p.z;
 		}
 		// Ground plane model
-		Eigen::VectorXf result = points*normal;
+		Eigen::VectorXf result = points * normal;
 		// Road plane threshold filter
 		typename pcl::PointCloud<PointT>::Ptr cloud_plane(new pcl::PointCloud<PointT>());
 		typename pcl::PointCloud<PointT>::Ptr cloud_other(new pcl::PointCloud<PointT>());
