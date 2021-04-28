@@ -41,6 +41,8 @@ int32_t main(int32_t argc, char **argv) {
 
         // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
+        
+        std::unique_ptr<cluon::SharedMemory> sharedMemory(nullptr); // Create shared memory
 
         std::string kittiPath;
         for (auto e : commandlineArguments) {
@@ -54,12 +56,12 @@ int32_t main(int32_t argc, char **argv) {
             std::cerr << argv[0] << ": Failed to open '" << kittiPath << "'" << std::endl;
         else{
             std::string oxtsPath  = kittiPath + "oxts/data/";
-            //std::string lidarPath = kittiPath + "velodyne_points/data/";
+            std::string lidarPath = kittiPath + "velodyne_points/data/";
             std::vector<std::string> files_oxts;
-            //std::vector<std::string> files_lidar;
+            std::vector<std::string> files_lidar;
             int16_t fileNum;
             std::tie(files_oxts, fileNum) = loadFile(oxtsPath, VERBOSE);
-            //std::tie(files_lidar, fileNum) = loadFile(lidarPath, VERBOSE);
+            std::tie(files_lidar, fileNum) = loadFile(lidarPath, VERBOSE);
 
             std::vector<Oxts_Data> oxts_data;
             auto timer_oxts = std::chrono::system_clock::now();
@@ -73,9 +75,32 @@ int32_t main(int32_t argc, char **argv) {
 
             int16_t NUM = 0;
 
-            auto atFrequency{[&VERBOSE, &od4, &oxts_data, &IDSENDER, &NUM]() -> bool{
+            auto atFrequency{[&VERBOSE, &od4, &sharedMemory, &NAME, &oxts_data, &files_lidar, &IDSENDER, &NUM]() -> bool{
                 cluon::data::TimeStamp sampleTime{cluon::time::now()};
                 auto oxts_reading = oxts_data[NUM];
+
+                // Copy point cloud into shared memory
+                pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>);
+                pcl::PointCloud<pcl::PointXYZ> cloud;
+                // pcl::PointCloud<pcl::PointXYZ>* output;
+                cloud_ptr = loadKitti(files_lidar, NUM);
+                cloud = *cloud_ptr;
+                //pcl::copyPointCloud(cloud, *output);
+                uint32_t sizecloud = sizeof(cloud_ptr) + cloud_ptr->points.size();
+
+                if(!sharedMemory){
+                    sharedMemory.reset(new cluon::SharedMemory{NAME, sizecloud});
+                    std::cout << "reset shared memory" << std::endl;
+                }
+                if(sharedMemory){
+                    cluon::data::TimeStamp ts = cluon::time::now();
+                    sharedMemory->lock();
+                    sharedMemory->setTimeStamp(ts);
+                    memcpy(sharedMemory->data(), static_cast<void const*>(cloud_ptr.get()), sharedMemory->size());
+                    sharedMemory->unlock();
+	                sharedMemory->notifyAll();
+                    std::cout << "Save PCD [" << NUM << "] to shared memory" << ", data size: " << sharedMemory->size() << " bytes." << std::endl;
+                }
 
                 opendlv::logic::sensation::Geolocation geolocation;
                 geolocation.latitude((float)oxts_reading.lat);            

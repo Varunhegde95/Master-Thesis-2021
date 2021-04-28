@@ -10,6 +10,7 @@
 #include <cstring>
 #include <dirent.h>
 #include <string>
+#include <sys/shm.h>
 
 // PCL Library
 #include <pcl/point_types.h>
@@ -17,6 +18,9 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/common/common.h>
 #include <pcl/point_types.h>
+#include <pcl/common/copy_point.h>
+
+
 
 class Oxts_Data{
     public:
