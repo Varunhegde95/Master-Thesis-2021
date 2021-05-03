@@ -71,7 +71,6 @@ int32_t main(int32_t argc, char **argv) {
             }
             timerCalculator(timer_oxts, "Loading all KITTI oxts data");
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Temporary Delay
 
             int16_t NUM = 0;
 
@@ -81,54 +80,54 @@ int32_t main(int32_t argc, char **argv) {
 
                 // Copy point cloud into shared memory
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>);
-                pcl::PointCloud<pcl::PointXYZ> cloud;
-                // pcl::PointCloud<pcl::PointXYZ>* output;
                 cloud_ptr = loadKitti(files_lidar, NUM);
-                cloud = *cloud_ptr;
-                //pcl::copyPointCloud(cloud, *output);
-                uint32_t sizecloud = sizeof(cloud_ptr) + cloud_ptr->points.size();
+                uint32_t sizecloud = sizeof(cloud_ptr) + cloud_ptr->points.size()+300;
+                //std::cout << "cloud point size: " << cloud_ptr->points.size() << std::endl;
 
                 if(!sharedMemory){
-                    sharedMemory.reset(new cluon::SharedMemory{NAME, sizecloud});
+                    sharedMemory.reset(new cluon::SharedMemory{NAME, sizecloud*15});
                     std::cout << "reset shared memory" << std::endl;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(700)); // Temporary Delay
                 }
                 if(sharedMemory){
+                    opendlv::logic::sensation::Geolocation geolocation;
+                    geolocation.latitude((float)oxts_reading.lat);            
+                    geolocation.longitude((float)oxts_reading.lon);
+                    geolocation.altitude((float)oxts_reading.alt);
+                    geolocation.heading((float)oxts_reading.yaw);
+
+                    opendlv::sensor::Acceleration acceleration;
+                    acceleration.ax((float)oxts_reading.ax);
+                    acceleration.ay((float)oxts_reading.ay);
+                    acceleration.az((float)oxts_reading.az);
+
+                    opendlv::logic::sensation::Equilibrioception equilibrioception;
+                    equilibrioception.vx((float)oxts_reading.vf);        // Forward speed
+                    equilibrioception.rollRate((float)oxts_reading.wx);        
+                    equilibrioception.pitchRate((float)oxts_reading.wy);
+                    equilibrioception.yawRate((float)oxts_reading.wz);
+
+                    od4.send(geolocation, sampleTime, IDSENDER);
+                    od4.send(acceleration, sampleTime, IDSENDER);
+                    od4.send(equilibrioception, sampleTime, IDSENDER);
+
+                    if (VERBOSE){
+                        std::cout << "Frame: " << NUM << " | Lat: " << oxts_reading.lat << ", Lon: " << oxts_reading.lon
+                        << ", Alt: " << oxts_reading.alt << ", Speed: " << oxts_reading.vf << ", Yaw: " << oxts_reading.yaw 
+                        << ", Roll Rate: " << oxts_reading.wx << ", Pitch Rate: " << oxts_reading.wy 
+                        << ", Yaw Rate: " << oxts_reading.wz << std::endl;
+                    }
+
                     cluon::data::TimeStamp ts = cluon::time::now();
                     sharedMemory->lock();
                     sharedMemory->setTimeStamp(ts);
                     memcpy(sharedMemory->data(), static_cast<void const*>(cloud_ptr.get()), sharedMemory->size());
                     sharedMemory->unlock();
 	                sharedMemory->notifyAll();
-                    std::cout << "Save PCD [" << NUM << "] to shared memory" << ", data size: " << sharedMemory->size() << " bytes." << std::endl;
+                    //std::cout << "Save PCD [" << NUM << "] to shared memory" << ", data size: " << sharedMemory->size() << " bytes." << std::endl;
+
                 }
 
-                opendlv::logic::sensation::Geolocation geolocation;
-                geolocation.latitude((float)oxts_reading.lat);            
-                geolocation.longitude((float)oxts_reading.lon);
-                geolocation.altitude((float)oxts_reading.alt);
-                geolocation.heading((float)oxts_reading.yaw);
-
-                opendlv::sensor::Acceleration acceleration;
-                acceleration.ax((float)oxts_reading.ax);
-                acceleration.ay((float)oxts_reading.ay);
-                acceleration.az((float)oxts_reading.az);
-
-                opendlv::logic::sensation::Equilibrioception equilibrioception;
-                equilibrioception.vx((float)oxts_reading.vf);        // Forward speed
-                equilibrioception.rollRate((float)oxts_reading.wx);        
-                equilibrioception.pitchRate((float)oxts_reading.wy);
-                equilibrioception.yawRate((float)oxts_reading.wz);
-
-                od4.send(geolocation, sampleTime, IDSENDER);
-                od4.send(acceleration, sampleTime, IDSENDER);
-                od4.send(equilibrioception, sampleTime, IDSENDER);
-
-                if (VERBOSE){
-                    std::cout << "Frame: " << NUM << " | Lat: " << oxts_reading.lat << ", Lon: " << oxts_reading.lon
-                    << ", Alt: " << oxts_reading.alt << ", Speed: " << oxts_reading.vf << ", Yaw: " << oxts_reading.yaw 
-                    << ", Roll Rate: " << oxts_reading.wx << ", Pitch Rate: " << oxts_reading.wy 
-                    << ", Yaw Rate: " << oxts_reading.wz << std::endl;
-                }
                 NUM ++;
             }};
 

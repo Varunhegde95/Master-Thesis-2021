@@ -1,3 +1,4 @@
 opendlv-unscented-kalman-filter/src/.vscode
 opendlv-kitti-replay/src/.vscode
 opendlv-pointcloud-preprocessing/src/.vscode
+.vscode

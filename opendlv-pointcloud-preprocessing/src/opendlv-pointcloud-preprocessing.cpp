@@ -47,8 +47,6 @@ int32_t main(int32_t argc, char **argv) {
         CameraAngle camera_angle = TOP; // Set viewercamera angle
         visual.initCamera(viewer, BLACK, camera_angle); // Initialize PCL viewer
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Temporary Delay
-
         // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
         
@@ -61,16 +59,47 @@ int32_t main(int32_t argc, char **argv) {
         
             int16_t NUM = 0;
             pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPCL(new pcl::PointCloud<pcl::PointXYZ>);
-            cloudPCL->resize(shmPCD->size());
-            //std::cout << "cloudPCL size: " << cloudPCL->size() << std::endl;
+            cloudPCL->resize(shmPCD->size()/15);
+
             while(od4.isRunning()){
                 shmPCD->wait();
                 shmPCD->lock();
-                //memcpy(&cloudPCL, shmPCD->data(), sizeof(cloudPCL));
-                //std::cout << "Read shared memory PCD" << std::endl;
+                memcpy(&(cloudPCL->points[0]), shmPCD->data(), shmPCD->size());
+                viewer.removeAllPointClouds();
+                std::cout << "Read shared memory PCD [" << NUM << "], size: " << cloudPCL->points.size() << std::endl;
                 shmPCD->unlock();
 
-                //visual.showPointcloud(viewer, cloudPCL, 2, GREEN, "PCD road");
+                /*------ 1. Down Sampling ------*/
+                auto cloud_down = filter.VoxelGridDownSampling(cloudPCL, 0.3f);
+
+                /*------ 2. Crop Box Filter [Remove roof] ------*/
+                //Distance Crop Box
+                const Eigen::Vector4f min_point(-40, -25, -3, 1);
+                const Eigen::Vector4f max_point(40, 25, 4, 1);
+                cloud_down = filter.boxFilter(cloud_down, min_point, max_point);
+
+                const Eigen::Vector4f roof_min(-1.5, -1.7, -1, 1);
+                const Eigen::Vector4f roof_max(2.6, 1.7, -0.4, 1);
+                cloud_down = filter.boxFilter(cloud_down, roof_min, roof_max, true); // Remove roof outliers
+
+                /*------ 3. Statistical Outlier Removal ------*/
+                cloud_down = filter.StatisticalOutlierRemoval(cloud_down, 30, 2.0);
+
+                /*------ 4. Plane Segmentation ------*/
+                const float SENSOR_HEIGHT = 2;
+                std::sort(cloud_down->points.begin(),cloud_down->points.end(),point_cmp); // Resort points in Z axis
+                auto cloud_down_sorted = filter.PassThroughFilter(cloud_down, "z", std::array<float, 2> {-SENSOR_HEIGHT-0.1, 0.5f}); // 'Z' Pass filter
+                auto RoughGroundPoints = segmentation.RoughGroundExtraction(cloud_down, 1.0, 70);
+                // RANSAC Segmentation
+                pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_road(new pcl::PointCloud<pcl::PointXYZ>());
+                pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_other(new pcl::PointCloud<pcl::PointXYZ>());
+                // std::tie(cloud_road, cloud_other) = segmentation.PlaneSegmentationRANSAC(cloud_down, RoughGroundPoints, 150, 0.2);
+                std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.3f);
+
+                visual.showPointcloud(viewer, cloud_other, 2, GREEN, "PCD other");
+                visual.showPointcloud(viewer, cloud_road, 2, RED, "PCD road");
+                viewer.spinOnce();
+                NUM ++;
             }
         }
         retCode = 0;
