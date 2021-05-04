@@ -71,7 +71,6 @@ int32_t main(int32_t argc, char **argv) {
             }
             timerCalculator(timer_oxts, "Loading all KITTI oxts data");
 
-
             int16_t NUM = 0;
 
             auto atFrequency{[&VERBOSE, &od4, &sharedMemory, &NAME, &oxts_data, &files_lidar, &IDSENDER, &NUM]() -> bool{
@@ -85,7 +84,7 @@ int32_t main(int32_t argc, char **argv) {
                 //std::cout << "cloud point size: " << cloud_ptr->points.size() << std::endl;
 
                 if(!sharedMemory){
-                    sharedMemory.reset(new cluon::SharedMemory{NAME, sizecloud*15});
+                    sharedMemory.reset(new cluon::SharedMemory{NAME, sizecloud*12});
                     std::cout << "reset shared memory" << std::endl;
                     std::this_thread::sleep_for(std::chrono::milliseconds(700)); // Temporary Delay
                 }
@@ -125,16 +124,13 @@ int32_t main(int32_t argc, char **argv) {
                     sharedMemory->unlock();
 	                sharedMemory->notifyAll();
                     //std::cout << "Save PCD [" << NUM << "] to shared memory" << ", data size: " << sharedMemory->size() << " bytes." << std::endl;
-
                 }
-
                 NUM ++;
             }};
 
             while(NUM != fileNum && od4.isRunning()){
                 od4.timeTrigger(FREQ, atFrequency);
             }
-
             retCode = 0;
         }
     }
