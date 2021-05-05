@@ -30,7 +30,6 @@ services:
         #depends_on:
         #- "kitti-replay"
         volumes:
-        - ${HOME}/Learning_PCL/Test_data/2011_09_26/2011_09_26_drive_0117_sync:/opt/recordings
         - /tmp:/tmp
         command: "--cid=111 --freq=10 --name_read=kitti.pcd --name_send=processed.pcd --display --verbose"
 
@@ -44,7 +43,25 @@ services:
         network_mode: "host"
         depends_on:
         - "kitti-replay"
-        command: "--cid=111 --freq=10 --imu-freq=10 --gps-freq=10 --verbose"
+        command: "--cid=111 --freq=10 --imu-freq=10 --gps-freq=10 --display --verbose"
+
+    #pointcloud_registration:
+    #    container_name: pointcloud_registration
+    #    build:
+    #        context: ./opendlv-pointcloud-registration
+    #        dockerfile: Dockerfile
+    #    image: opendlv-pointcloud-registration:v0.1
+    #    runtime: nvidia
+    #    ipc: "host"
+    #    network_mode: "host"
+    #    environment:
+    #    - NVIDIA_VISIBLE_DEVICES=all
+    #    - DISPLAY=${DISPLAY}
+    #    depends_on:
+    #    - "pointcloud_processing"
+    #    volumes:
+    #    - /tmp:/tmp
+    #    command: "--cid=111 --freq=10 --name_processed=processed.pcd --display --verbose"
 
     map-plotter:
         container_name: map-plotter

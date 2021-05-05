@@ -43,7 +43,7 @@ int32_t main(int32_t argc, char **argv) {
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
         
         std::unique_ptr<cluon::SharedMemory> sharedMemory(nullptr); // Create shared memory
-
+        
         std::string kittiPath;
         for (auto e : commandlineArguments) {
             if (e.second.empty() && e.first != PROGRAM) {
@@ -80,11 +80,12 @@ int32_t main(int32_t argc, char **argv) {
                 // Copy point cloud into shared memory
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>);
                 cloud_ptr = loadKitti(files_lidar, NUM);
-                uint32_t sizecloud = sizeof(cloud_ptr) + cloud_ptr->points.size()+300;
-                //std::cout << "cloud point size: " << cloud_ptr->points.size() << std::endl;
+                uint32_t sizecloud = sizeof(cloud_ptr) + cloud_ptr->points.size();
+                std::cout << "cloud point size: " << cloud_ptr->points.size() << std::endl;
+                std::cout << "Shm sizecloud: " << sizecloud << std::endl;
 
                 if(!sharedMemory){
-                    sharedMemory.reset(new cluon::SharedMemory{NAME, sizecloud*12});
+                    sharedMemory.reset(new cluon::SharedMemory{NAME, sizecloud*15});
                     std::cout << "reset shared memory" << std::endl;
                     std::this_thread::sleep_for(std::chrono::milliseconds(700)); // Temporary Delay
                 }

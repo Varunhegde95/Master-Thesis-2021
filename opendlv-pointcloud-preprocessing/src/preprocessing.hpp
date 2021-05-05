@@ -38,13 +38,6 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
 
-// Registration
-#include <pcl/registration/icp.h>        // ICP point-to-point
-#include <pcl/registration/icp_nl.h>     // ICP Nolinear point-to-plane
-#include <pcl/registration/gicp.h>       // ICP plane-to-plane
-#include <pcl/registration/ndt.h>        // NDT Registration
-#include <pcl/registration/transforms.h> // Transformation matrix 
-
 // Visualization
 #include <pcl/visualization/pcl_visualizer.h>
 

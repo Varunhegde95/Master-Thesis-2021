@@ -17,6 +17,8 @@
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
 
+#include "registration.hpp"
+
 int32_t main(int32_t argc, char **argv) {
     int32_t retCode{1};
     const std::string PROGRAM{argv[0]};
@@ -31,16 +33,63 @@ int32_t main(int32_t argc, char **argv) {
         std::cerr << "Example: " << argv[0] << " --cid=111 --name=data --verbose --id-sender=100" << std::endl;
     }
     else {
-        const std::string NAME{commandlineArguments["name"]};
+        const std::string NAME{commandlineArguments["name_processed"]};
         float const FREQ{std::stof(commandlineArguments["freq"])}; // Frequency
         const bool DISPLAY{commandlineArguments.count("display") != 0};
         const bool VERBOSE{commandlineArguments.count("verbose") != 0};
-        uint32_t const IDSENDER{(commandlineArguments["id-sender"].size() != 0)               
-            ? static_cast<uint32_t>(std::stoi(commandlineArguments["id-sender"])) : 0};
         
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
         // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
+        
+        std::cout << "Connecting to shared memory " << NAME << std::endl;
+        std::unique_ptr<cluon::SharedMemory> shmCloud{new cluon::SharedMemory{NAME}};
 
+        Visual<pcl::PointXYZ> visual;
+        pcl::visualization::PCLVisualizer viewer("PCD Registration"); // Initialize PCD viewer
+        CameraAngle camera_angle = TOP; // Set viewercamera angle
+        visual.initCamera(viewer, BLACK, camera_angle); // Initialize PCL viewer
+
+        if (shmCloud && shmCloud->valid() ) {
+            std::clog << argv[0] << ": Attached to shared ARGB memory '" 
+            << shmCloud->name() << " (" << shmCloud->size() 
+            << " bytes)." << std::endl;
+
+            int16_t NUM = 0;
+            pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+            cloud->resize((size_t)5000);
+
+            while(od4.isRunning()){
+                auto frame_timer = std::chrono::system_clock::now();
+                shmCloud->wait();
+                shmCloud->lock();
+                memcpy(&(cloud->points[0]), shmCloud->data(), shmCloud->size());
+                if(VERBOSE)
+                    std::cout << "Read shared memory PCD [" << NUM << "], size: " << cloud->points.size() << std::endl;
+                shmCloud->unlock();
+                if(DISPLAY){
+                    viewer.removeAllPointClouds();
+                }
+                /*-------------------------------------------------------------------------------------*/
+
+
+                /*-------------------------------------------------------------------------------------*/
+                /*------ Visualization ------*/
+                if (VERBOSE){
+                    std::cout << "Frame (" << NUM << "), ";
+                    timerCalculator(frame_timer, "Every Frame");
+                }
+                if(DISPLAY){
+                    visual.showPointcloud(viewer, cloud, 2, WHITE, "PCD Registration");
+                    viewer.spinOnce();
+                }
+                NUM ++;
+            }
+        }
+        else
+            std::cout << "Error..." << std::endl;
+        retCode = 0;
     }
     return retCode;
 }
