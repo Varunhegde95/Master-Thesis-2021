@@ -80,7 +80,9 @@ int32_t main(int32_t argc, char **argv) {
                 // Copy point cloud into shared memory
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>);
                 cloud_ptr = loadKitti(files_lidar, NUM);
-                uint32_t sizecloud = sizeof(cloud_ptr) + cloud_ptr->points.size();
+                //uint32_t sizecloud = sizeof(cloud_ptr) + cloud_ptr->points.size();
+                uint32_t sizecloud = 125000;
+                cloud_ptr->points.resize(sizecloud);
                 std::cout << "cloud point size: " << cloud_ptr->points.size() << std::endl;
                 std::cout << "Shm sizecloud: " << sizecloud << std::endl;
 
