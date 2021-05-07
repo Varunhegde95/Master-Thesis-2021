@@ -43,27 +43,30 @@ int32_t main(int32_t argc, char **argv) {
 
         Filters<pcl::PointXYZ> filter;
         Segmentation<pcl::PointXYZ> segmentation;
-        Visual<pcl::PointXYZ> visual;
-        pcl::visualization::PCLVisualizer viewer("PCD Preprocessing"); // Initialize PCD viewer
-        CameraAngle camera_angle = TOP; // Set viewercamera angle
-        if(DISPLAY)
-            visual.initCamera(viewer, BLACK, camera_angle); // Initialize PCL viewer
+        // Visual<pcl::PointXYZ> visual;
+        // pcl::visualization::PCLVisualizer viewer("PCD Preprocessing"); // Initialize PCD viewer
+        // CameraAngle camera_angle = TOP; // Set viewercamera angle
+        // if(DISPLAY)
+        //     visual.initCamera(viewer, BLACK, camera_angle); // Initialize PCL viewer
 
         //Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
         
         std::cout << "Connecting to shared memory " << NAME_READ << std::endl;
         std::unique_ptr<cluon::SharedMemory> shmRead{new cluon::SharedMemory{NAME_READ}};
-        //std::unique_ptr<cluon::SharedMemory> shmSend{new cluon::SharedMemory{NAME_SEND, (uint32_t)5000*15}}; // Create shared memory
-
+        //std::unique_ptr<cluon::SharedMemory> shmSend{new cluon::SharedMemory{NAME_SEND, (uint32_t)3000*15}}; // Create shared memory
+        std::unique_ptr<cluon::SharedMemory> shmSend(nullptr);
+        shmSend.reset(new cluon::SharedMemory{NAME_SEND, (uint32_t)700*15});
+        // std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Temporary Delay
         // if(!shmSend){
-        //     shmSend.reset(new cluon::SharedMemory{NAME_SEND, (uint32_t)5000*10});
-        //     std::cout << "Set shared memory: " << shmSend->name() << " (" << shmSend->size() 
-        //     << " bytes)." << std::endl;
+        //     shmSend.reset(new cluon::SharedMemory{NAME_SEND, shmRead->size()});
+            std::cout << "Set shared memory: " << shmSend->name() << " (" << shmSend->size() 
+            << " bytes)." << std::endl;
         // }
 
-        if (shmRead && shmRead->valid()) {
-            std::clog << argv[0] << ": Attached to shared ARGB memory '" 
+        pcl::PointCloud<pcl::PointXYZ>::Ptr CLOUD_SEND(new pcl::PointCloud<pcl::PointXYZ>);  // TEST!!!!!!!!!!
+        if (shmRead && shmRead->valid() && shmSend  && shmSend->valid()) {
+            std::clog << argv[0] << ": Attached to shared PCD memory '" 
             << shmRead->name() << " (" << shmRead->size() 
             << " bytes)." << std::endl;
         
@@ -76,17 +79,22 @@ int32_t main(int32_t argc, char **argv) {
                 shmRead->wait();
                 shmRead->lock();
                 memcpy(&(cloudPCL->points[0]), shmRead->data(), shmRead->size());
-                if(DISPLAY){
-                    viewer.removeAllPointClouds();
-                }
                 if(VERBOSE)
                     std::cout << "Read shared memory PCD [" << NUM << "], size: " << cloudPCL->points.size() << std::endl;
                 shmRead->unlock();
+                // if(DISPLAY){
+                //     viewer.removeAllPointClouds();
+                // }
+
+                pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_down(new pcl::PointCloud<pcl::PointXYZ>);
+                pcl::copyPointCloud(*cloudPCL, *cloud_down);
 
                 /*------ 1. Down Sampling ------*/
-                auto cloud_down = filter.VoxelGridDownSampling(cloudPCL, 0.5f);
+                //std::sort(cloud->points.begin(),cloud->points.end(),point_cmp); // Resort points in Z axis
+                //auto cloud_down = filter.VoxelGridDownSampling(cloudPCL, 0.5f);
+                //timerCalculator(frame_timer, "Down Sampling");
 
-                /*------ 2. Crop Box Filter [Remove roof] ------*/
+                // /*------ 2. Crop Box Filter [Remove roof] ------*/
                 const Eigen::Vector4f min_point(-40, -25, -2, 1);
                 const Eigen::Vector4f max_point(40, 25, 4, 1);
                 cloud_down = filter.boxFilter(cloud_down, min_point, max_point); //Distance Crop Box
@@ -94,8 +102,9 @@ int32_t main(int32_t argc, char **argv) {
                 const Eigen::Vector4f roof_min(-1.5, -1.7, -1, 1);
                 const Eigen::Vector4f roof_max(2.6, 1.7, -0.4, 1);
                 cloud_down = filter.boxFilter(cloud_down, roof_min, roof_max, true); // Remove roof outliers
-
-                /*------ 3. Statistical Outlier Removal ------*/
+                
+                
+                // /*------ 3. Statistical Outlier Removal ------*/
                 cloud_down = filter.StatisticalOutlierRemoval(cloud_down, 30, 2.0);
 
                 /*------ 4. Plane Segmentation ------*/
@@ -110,29 +119,32 @@ int32_t main(int32_t argc, char **argv) {
                 std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.3f);
 
                 //uint32_t sizecloud_processed = sizeof(cloud_other) + cloud_other->points.size()+300;
-                //std::cout << "Other cloud size: " << sizecloud_processed << std::endl;
+                std::cout << "Other cloud size: " << cloud_other->points.size() << std::endl;
 
+                
+                std::cout <<  "Saving processed pcd to shared memory.." << std::endl;
+                cloud_other->points.resize((size_t)700);
+                cluon::data::TimeStamp ts = cluon::time::now();
+                shmSend->lock();
+                shmSend->setTimeStamp(ts);
+                //memcpy(shmSend->data(), static_cast<void const*>(cloudPCL.get()), shmSend->size());
+                memcpy(shmSend->data(), static_cast<void const*>(cloud_other.get()), shmSend->size());
+                shmSend->unlock();
+                shmSend->notifyAll();
+                //std::cout << "Save PCD [" << NUM << "] to shared memory" << ", PCD point size: " << cloud_road->points.size() << std::endl;
 
-                /*------ 5. Save to the shared memory ------*/
-                // std::cout <<  "Saving processed pcd to shared memory.." << std::endl;
-                // cluon::data::TimeStamp ts = cluon::time::now();
-                // shmSend->lock();
-                // shmSend->setTimeStamp(ts);
-                // memcpy(shmSend->data(), static_cast<void const*>(cloud_road.get()), shmSend->size());
-                // shmSend->unlock();
-	            // shmSend->notifyAll();
-                // std::cout << "Save PCD [" << NUM << "] to shared memory" << ", PCD point size: " << cloud_road->points.size() << std::endl;
 
                 /*------ 6. Visualization ------*/
                 if(VERBOSE){
                     std::cout << "Frame (" << NUM << "), ";
                     timerCalculator(frame_timer, "Every Frame");
                 }
-                if(DISPLAY){
-                    visual.showPointcloud(viewer, cloud_other, 2, GREEN, "PCD Preprocessing");
-                    //visual.showPointcloud(viewer, cloud_road, 2, RED, "PCD road");
-                    viewer.spinOnce();
-                }
+                // if(DISPLAY){
+                //     std::cout << "PCD point size: " << cloud_down->points.size() << std::endl;
+                //     visual.showPointcloud(viewer, cloud_down, 2, GREEN, "PCD Preprocessing");
+                //     //visual.showPointcloud(viewer, cloud_road, 2, RED, "PCD road");
+                //     viewer.spinOnce();
+                // }
                 NUM ++;
             }
         }

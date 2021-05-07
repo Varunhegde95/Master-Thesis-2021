@@ -20,7 +20,13 @@
 #include <pcl/point_types.h>
 #include <pcl/common/copy_point.h>
 
-
+// Filters
+#include <pcl/filters/passthrough.h>                 // PassThrough Filter
+#include <pcl/filters/voxel_grid.h>                  // VoxelGrid Down Sampling
+#include <pcl/filters/statistical_outlier_removal.h> // Statistical Outlier Removal
+#include <pcl/filters/radius_outlier_removal.h>      // Radius Outlier Removal
+#include <pcl/filters/extract_indices.h>             // Extract pointCloud according to indices
+#include <pcl/filters/crop_box.h>
 
 class Oxts_Data{
     public:
@@ -159,5 +165,114 @@ void
     std::cout << "[--Timer--] " << function <<" time used: " << time_passed << " [s]." << std::endl;
     //return time_passed; // [seconds]
 }
+
+/*-------------------------------------------------------------------------------------*/
+
+template<typename PointT>
+class Filters{
+public:
+    // Constructor
+    Filters() = default;
+
+    // Destructor
+    ~Filters() = default;
+	
+	/**
+	 * @brief Pass through filter (the background can be removed if the background has a certain distance from the foreground)
+	 * 
+	 * @param cloud Input pointcloud
+	 * @param axis Choose filter axis [Example: "z"]
+	 * @param limits Set the filter constraints
+	 * @return Filtered pointcloud 
+	 */
+     typename pcl::PointCloud<PointT>::Ptr PassThroughFilter( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
+															 const std::string &axis, 
+															 const std::array<float, 2> &limits){
+		typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
+		pcl::PassThrough<PointT> passFilter;
+		passFilter.setInputCloud(cloud);  	 // Set input point cloud 
+		passFilter.setFilterFieldName(axis); // Set filter axis
+		passFilter.setFilterLimits(limits[0], limits[1]); // Set the filter acceptable range
+		passFilter.filter(*cloud_filtered);
+		std::cout << "[PassFilter " << axis << "(" << limits[0] << " -> " << limits[1] << ") ] " << " Original points: " 
+				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
+		return cloud_filtered;
+	}
+
+	/**
+	 * @brief Pick points inside/outside of the box
+	 * 
+	 * @param cloud Input pointcloud
+	 * @param min_point Box minimum corner point
+	 * @param max_point Box maximum corner point
+	 * @param setNegative true: choose points outside of the box, false: choose points inside of the box
+	 * @return Filtered pointcloud
+	 */
+	 typename pcl::PointCloud<PointT>::Ptr boxFilter( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
+													 const Eigen::Vector4f &min_point, 
+													 const Eigen::Vector4f &max_point, 
+													 const bool &setNegative = false){
+		pcl::CropBox<PointT> region(true);
+		std::vector<int> indices;
+		region.setMin(min_point);
+		region.setMax(max_point);
+		region.setInputCloud(cloud);
+		region.filter(indices);
+		pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+		for (int index : indices)
+			inliers->indices.push_back(index);
+		pcl::ExtractIndices<PointT> extract;
+		// Extract the noise point cloud on the roof
+		extract.setInputCloud(cloud);
+		extract.setIndices(inliers);
+		extract.setNegative(setNegative);
+		extract.filter(*cloud);
+		return cloud;
+	}
+
+	/** 
+	 * @brief DownSample the dataset using a given voxel leaf size
+	 * 
+	 * @param cloud2 Inpout pointcloud
+	 * @param filterRes voxel leaf size
+	 * @return Filtered pointcloud
+	**/
+     typename pcl::PointCloud<PointT>::Ptr VoxelGridDownSampling( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
+																 const float &filterRes = 0.3f){
+		typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
+		pcl::VoxelGrid<PointT> voxelFilter;
+		voxelFilter.setInputCloud(cloud); // Set input point cloud
+		voxelFilter.setLeafSize(filterRes, filterRes, filterRes); // Set voxel size
+		voxelFilter.filter(*cloud_filtered);
+		std::cout << "[VoxelGridDownSampling]  Original points: " << cloud->width * cloud->height 
+				  <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
+		return cloud_filtered;
+	}
+
+	/**
+	 * @brief 
+	 * 
+	 * @param cloud Input pointcloud
+	 * @param meanK Set the number of nearest neighbors to use for mean distance estimation.
+	 * @param StddevMulThresh Threshold for determining outliers [smaller -> more stringent]
+	 * @return Filtered pointcloud
+	 */
+     typename pcl::PointCloud<PointT>::Ptr StatisticalOutlierRemoval( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
+																	  const int &meanK, 
+																	  const double &StddevMulThresh ){
+    	typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
+		pcl::StatisticalOutlierRemoval<PointT> sor;
+		sor.setInputCloud(cloud);
+		sor.setMeanK(meanK); 
+		sor.setStddevMulThresh(StddevMulThresh); 
+		sor.filter(*cloud_filtered);
+		std::cout << "[StatisticalOutlierRemoval] " << " Original points: " 
+				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
+		return cloud_filtered;
+	}  
+
+};
+
+/*-------------------------------------------------------------------------------------*/
 
 #endif /*KITTI_REPLAY_HPP*/

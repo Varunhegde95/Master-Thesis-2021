@@ -47,18 +47,19 @@ int32_t main(int32_t argc, char **argv) {
         std::unique_ptr<cluon::SharedMemory> shmCloud{new cluon::SharedMemory{NAME}};
 
         Visual<pcl::PointXYZ> visual;
+        Filters<pcl::PointXYZ> filter;
         pcl::visualization::PCLVisualizer viewer("PCD Registration"); // Initialize PCD viewer
         CameraAngle camera_angle = TOP; // Set viewercamera angle
         visual.initCamera(viewer, BLACK, camera_angle); // Initialize PCL viewer
 
         if (shmCloud && shmCloud->valid() ) {
-            std::clog << argv[0] << ": Attached to shared ARGB memory '" 
+            std::clog << argv[0] << ": Attached to shared PCD memory '" 
             << shmCloud->name() << " (" << shmCloud->size() 
             << " bytes)." << std::endl;
 
             int16_t NUM = 0;
             pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-            cloud->resize((size_t)5000);
+            cloud->resize(shmCloud->size()/15);
 
             while(od4.isRunning()){
                 auto frame_timer = std::chrono::system_clock::now();
@@ -68,11 +69,9 @@ int32_t main(int32_t argc, char **argv) {
                 if(VERBOSE)
                     std::cout << "Read shared memory PCD [" << NUM << "], size: " << cloud->points.size() << std::endl;
                 shmCloud->unlock();
-                if(DISPLAY){
-                    viewer.removeAllPointClouds();
-                }
+     
                 /*-------------------------------------------------------------------------------------*/
-
+                //auto cloud_down = filter.VoxelGridDownSampling(cloud, 0.6f);
 
                 /*-------------------------------------------------------------------------------------*/
                 /*------ Visualization ------*/
@@ -81,14 +80,13 @@ int32_t main(int32_t argc, char **argv) {
                     timerCalculator(frame_timer, "Every Frame");
                 }
                 if(DISPLAY){
+                    viewer.removeAllPointClouds();
                     visual.showPointcloud(viewer, cloud, 2, WHITE, "PCD Registration");
                     viewer.spinOnce();
                 }
                 NUM ++;
             }
         }
-        else
-            std::cout << "Error..." << std::endl;
         retCode = 0;
     }
     return retCode;
