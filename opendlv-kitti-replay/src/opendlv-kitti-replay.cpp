@@ -39,6 +39,8 @@ int32_t main(int32_t argc, char **argv) {
         uint32_t const IDSENDER{(commandlineArguments["id-sender"].size() != 0)               
             ? static_cast<uint32_t>(std::stoi(commandlineArguments["id-sender"])) : 0};
 
+        Filters<pcl::PointXYZ> filter;
+
         // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
         
@@ -73,7 +75,7 @@ int32_t main(int32_t argc, char **argv) {
 
             int16_t NUM = 0;
 
-            auto atFrequency{[&VERBOSE, &od4, &sharedMemory, &NAME, &oxts_data, &files_lidar, &IDSENDER, &NUM]() -> bool{
+            auto atFrequency{[&VERBOSE, &od4, &sharedMemory, &NAME, &filter, &oxts_data, &files_lidar, &IDSENDER, &NUM]() -> bool{
                 cluon::data::TimeStamp sampleTime{cluon::time::now()};
                 auto oxts_reading = oxts_data[NUM];
 
@@ -81,13 +83,15 @@ int32_t main(int32_t argc, char **argv) {
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>);
                 cloud_ptr = loadKitti(files_lidar, NUM);
                 //uint32_t sizecloud = sizeof(cloud_ptr) + cloud_ptr->points.size();
-                uint32_t sizecloud = 125000;
-                cloud_ptr->points.resize(sizecloud);
-                std::cout << "cloud point size: " << cloud_ptr->points.size() << std::endl;
+                uint32_t sizecloud = 100000;
+                //cloud_ptr->points.resize(sizecloud);
+                auto cloud = filter.RandomSampling(cloud_ptr, sizecloud); // Resize the pointcloud to 100000 points.
+
+                std::cout << "cloud point size: " << cloud->points.size() << std::endl;
                 std::cout << "Shm sizecloud: " << sizecloud << std::endl;
 
                 if(!sharedMemory){
-                    sharedMemory.reset(new cluon::SharedMemory{NAME, sizecloud*15});
+                    sharedMemory.reset(new cluon::SharedMemory{NAME, sizecloud*16});
                     std::cout << "reset shared memory" << std::endl;
                     std::this_thread::sleep_for(std::chrono::milliseconds(700)); // Temporary Delay
                 }
@@ -123,7 +127,7 @@ int32_t main(int32_t argc, char **argv) {
                     cluon::data::TimeStamp ts = cluon::time::now();
                     sharedMemory->lock();
                     sharedMemory->setTimeStamp(ts);
-                    memcpy(sharedMemory->data(), static_cast<void const*>(cloud_ptr.get()), sharedMemory->size());
+                    memcpy(sharedMemory->data(), static_cast<void const*>(cloud.get()), sharedMemory->size());
                     sharedMemory->unlock();
 	                sharedMemory->notifyAll();
                     //std::cout << "Save PCD [" << NUM << "] to shared memory" << ", data size: " << sharedMemory->size() << " bytes." << std::endl;

@@ -33,6 +33,7 @@
 #include <pcl/filters/radius_outlier_removal.h>      // Radius Outlier Removal
 #include <pcl/filters/extract_indices.h>             // Extract pointCloud according to indices
 #include <pcl/filters/crop_box.h>
+#include <pcl/filters/random_sample.h>
 
 // Segmentation
 #include <pcl/segmentation/sac_segmentation.h>
@@ -260,6 +261,24 @@ public:
 		return cloud_filtered;
 	}  
 
+	/**
+	 * @brief Random down sampling to size 'sample_number'
+	 * 
+	 * @param cloud Input pointcloud
+	 * @param sample_number Set the target pointcloud size number
+	 * @return pcl::PointCloud<PointT>::Ptr 
+	 */
+	typename pcl::PointCloud<PointT>::Ptr RandomSampling(const typename pcl::PointCloud<PointT>::Ptr &cloud,
+														 const uint32_t sample_number){
+		typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
+		pcl::RandomSample<PointT> rs;
+		rs.setInputCloud(cloud);
+		rs.setSample(sample_number);
+		rs.filter(*cloud_filtered);
+		std::cout << "[RandomDownSampling] " << " Original points: " 
+				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
+		return cloud_filtered;
+	}
 };
 
 /*-------------------------------------------------------------------------------------*/

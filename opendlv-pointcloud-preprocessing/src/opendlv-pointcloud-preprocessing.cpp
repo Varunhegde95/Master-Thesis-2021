@@ -43,11 +43,11 @@ int32_t main(int32_t argc, char **argv) {
 
         Filters<pcl::PointXYZ> filter;
         Segmentation<pcl::PointXYZ> segmentation;
-        // Visual<pcl::PointXYZ> visual;
-        // pcl::visualization::PCLVisualizer viewer("PCD Preprocessing"); // Initialize PCD viewer
-        // CameraAngle camera_angle = TOP; // Set viewercamera angle
-        // if(DISPLAY)
-        //     visual.initCamera(viewer, BLACK, camera_angle); // Initialize PCL viewer
+        Visual<pcl::PointXYZ> visual;
+        pcl::visualization::PCLVisualizer viewer("PCD Preprocessing"); // Initialize PCD viewer
+        CameraAngle camera_angle = TOP; // Set viewercamera angle
+        if(DISPLAY)
+            visual.initCamera(viewer, BLACK, camera_angle); // Initialize PCL viewer
 
         //Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
@@ -56,7 +56,7 @@ int32_t main(int32_t argc, char **argv) {
         std::unique_ptr<cluon::SharedMemory> shmRead{new cluon::SharedMemory{NAME_READ}};
         //std::unique_ptr<cluon::SharedMemory> shmSend{new cluon::SharedMemory{NAME_SEND, (uint32_t)3000*15}}; // Create shared memory
         std::unique_ptr<cluon::SharedMemory> shmSend(nullptr);
-        shmSend.reset(new cluon::SharedMemory{NAME_SEND, (uint32_t)700*15});
+        shmSend.reset(new cluon::SharedMemory{NAME_SEND, (uint32_t)5000*16});
         // std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Temporary Delay
         // if(!shmSend){
         //     shmSend.reset(new cluon::SharedMemory{NAME_SEND, shmRead->size()});
@@ -72,7 +72,7 @@ int32_t main(int32_t argc, char **argv) {
         
             int16_t NUM = 0;
             pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPCL(new pcl::PointCloud<pcl::PointXYZ>);
-            cloudPCL->resize(shmRead->size()/15);
+            cloudPCL->resize(shmRead->size()/16);
 
             while(od4.isRunning()){
                 auto frame_timer = std::chrono::system_clock::now();
@@ -86,16 +86,16 @@ int32_t main(int32_t argc, char **argv) {
                 //     viewer.removeAllPointClouds();
                 // }
 
-                pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_down(new pcl::PointCloud<pcl::PointXYZ>);
-                pcl::copyPointCloud(*cloudPCL, *cloud_down);
+                // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_down(new pcl::PointCloud<pcl::PointXYZ>);
+                // pcl::copyPointCloud(*cloudPCL, *cloud_down);
 
                 /*------ 1. Down Sampling ------*/
-                //std::sort(cloud->points.begin(),cloud->points.end(),point_cmp); // Resort points in Z axis
+                auto cloud_down = filter.RandomSampling(cloudPCL, 13000);
                 //auto cloud_down = filter.VoxelGridDownSampling(cloudPCL, 0.5f);
                 //timerCalculator(frame_timer, "Down Sampling");
 
                 // /*------ 2. Crop Box Filter [Remove roof] ------*/
-                const Eigen::Vector4f min_point(-40, -25, -2, 1);
+                const Eigen::Vector4f min_point(-40, -25, -1, 1);
                 const Eigen::Vector4f max_point(40, 25, 4, 1);
                 cloud_down = filter.boxFilter(cloud_down, min_point, max_point); //Distance Crop Box
 
@@ -111,26 +111,27 @@ int32_t main(int32_t argc, char **argv) {
                 const float SENSOR_HEIGHT = 2;
                 std::sort(cloud_down->points.begin(),cloud_down->points.end(),point_cmp); // Resort points in Z axis
                 auto cloud_down_sorted = filter.PassThroughFilter(cloud_down, "z", std::array<float, 2> {-SENSOR_HEIGHT-0.1, 0.5f}); // 'Z' Pass filter
-                auto RoughGroundPoints = segmentation.RoughGroundExtraction(cloud_down, 1.0, 60);
+                auto RoughGroundPoints = segmentation.RoughGroundExtraction(cloud_down, 1.0, 70);
                 // RANSAC Segmentation
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_road(new pcl::PointCloud<pcl::PointXYZ>());
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_other(new pcl::PointCloud<pcl::PointXYZ>());
-                // std::tie(cloud_road, cloud_other) = segmentation.PlaneSegmentationRANSAC(cloud_down, RoughGroundPoints, 150, 0.2);
-                std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.3f);
+                std::tie(cloud_road, cloud_other) = segmentation.PlaneSegmentationRANSAC(cloud_down, RoughGroundPoints, 150, 0.2);
+                // std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.3f);
 
-                //uint32_t sizecloud_processed = sizeof(cloud_other) + cloud_other->points.size()+300;
-                std::cout << "Other cloud size: " << cloud_other->points.size() << std::endl;
+                // //uint32_t sizecloud_processed = sizeof(cloud_other) + cloud_other->points.size()+300;
+                // std::cout << "Other cloud size: " << cloud_other->points.size() << std::endl;
 
                 
-                std::cout <<  "Saving processed pcd to shared memory.." << std::endl;
-                cloud_other->points.resize((size_t)700);
-                cluon::data::TimeStamp ts = cluon::time::now();
-                shmSend->lock();
-                shmSend->setTimeStamp(ts);
-                //memcpy(shmSend->data(), static_cast<void const*>(cloudPCL.get()), shmSend->size());
-                memcpy(shmSend->data(), static_cast<void const*>(cloud_other.get()), shmSend->size());
-                shmSend->unlock();
-                shmSend->notifyAll();
+                // std::cout <<  "Saving processed pcd to shared memory.." << std::endl;
+                // //cloud_other->points.resize((size_t)700);
+                // cloud_down = filter.RandomSampling(cloudPCL, 5000);
+                // cluon::data::TimeStamp ts = cluon::time::now();
+                // shmSend->lock();
+                // shmSend->setTimeStamp(ts);
+                // //memcpy(shmSend->data(), static_cast<void const*>(cloudPCL.get()), shmSend->size());
+                // memcpy(shmSend->data(), static_cast<void const*>(cloud_down.get()), shmSend->size());
+                // shmSend->unlock();
+                // shmSend->notifyAll();
                 //std::cout << "Save PCD [" << NUM << "] to shared memory" << ", PCD point size: " << cloud_road->points.size() << std::endl;
 
 
@@ -139,12 +140,13 @@ int32_t main(int32_t argc, char **argv) {
                     std::cout << "Frame (" << NUM << "), ";
                     timerCalculator(frame_timer, "Every Frame");
                 }
-                // if(DISPLAY){
-                //     std::cout << "PCD point size: " << cloud_down->points.size() << std::endl;
-                //     visual.showPointcloud(viewer, cloud_down, 2, GREEN, "PCD Preprocessing");
-                //     //visual.showPointcloud(viewer, cloud_road, 2, RED, "PCD road");
-                //     viewer.spinOnce();
-                // }
+                if(DISPLAY){
+                    viewer.removeAllPointClouds();
+                    //std::cout << "PCD point size: " << cloud_down->points.size() << std::endl;
+                    visual.showPointcloud(viewer, cloud_other, 2, GREEN, "PCD Preprocessing");
+                    //visual.showPointcloud(viewer, cloud_road, 2, RED, "PCD road");
+                    viewer.spinOnce();
+                }
                 NUM ++;
             }
         }

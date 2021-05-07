@@ -59,7 +59,7 @@ int32_t main(int32_t argc, char **argv) {
 
             int16_t NUM = 0;
             pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-            cloud->resize(shmCloud->size()/15);
+            cloud->resize(shmCloud->size()/16);
 
             while(od4.isRunning()){
                 auto frame_timer = std::chrono::system_clock::now();
@@ -71,8 +71,11 @@ int32_t main(int32_t argc, char **argv) {
                 shmCloud->unlock();
      
                 /*-------------------------------------------------------------------------------------*/
-                //auto cloud_down = filter.VoxelGridDownSampling(cloud, 0.6f);
+                // auto dowm_timer = std::chrono::system_clock::now();
+                // auto cloud_down = filter.RandomSampling(cloud, 3000);
 
+
+                // timerCalculator(dowm_timer, "Every Frame");
                 /*-------------------------------------------------------------------------------------*/
                 /*------ Visualization ------*/
                 if (VERBOSE){
