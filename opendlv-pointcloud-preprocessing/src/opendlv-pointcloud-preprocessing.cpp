@@ -54,7 +54,7 @@ int32_t main(int32_t argc, char **argv) {
         
         std::cout << "Connecting to shared memory " << NAME_READ << std::endl;
         std::unique_ptr<cluon::SharedMemory> shmRead{new cluon::SharedMemory{NAME_READ}};
-        uint32_t num_of_points = 8000;
+        uint32_t num_of_points = 9000;
         std::unique_ptr<cluon::SharedMemory> shmSend{new cluon::SharedMemory{NAME_SEND, (uint32_t)num_of_points*16}}; // Create shared memory
 
         std::cout << "Set shared memory: " << shmSend->name() << " (" << shmSend->size() 
@@ -81,15 +81,13 @@ int32_t main(int32_t argc, char **argv) {
                 //     viewer.removeAllPointClouds();
                 // }
 
-                // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_down(new pcl::PointCloud<pcl::PointXYZ>);
-                // pcl::copyPointCloud(*cloudPCL, *cloud_down);
                 if(NUM % 5 == 0){
                     auto frame_timer = std::chrono::system_clock::now();
                     /*------ 1. Down Sampling ------*/
                     auto cloud_down = filter.RandomSampling(cloudPCL, 40000);
                     //timerCalculator(frame_timer, "Down Sampling");
 
-                    // /*------ 2. Crop Box Filter [Remove roof] ------*/
+                    /*------ 2. Crop Box Filter [Remove roof] ------*/
                     const Eigen::Vector4f min_point(-40, -25, -1, 1);
                     const Eigen::Vector4f max_point(40, 25, 4, 1);
                     cloud_down = filter.boxFilter(cloud_down, min_point, max_point); //Distance Crop Box
@@ -98,8 +96,7 @@ int32_t main(int32_t argc, char **argv) {
                     const Eigen::Vector4f roof_max(2.6, 1.7, -0.4, 1);
                     cloud_down = filter.boxFilter(cloud_down, roof_min, roof_max, true); // Remove roof outliers
                     
-                    
-                    // /*------ 3. Statistical Outlier Removal ------*/
+                    /*------ 3. Statistical Outlier Removal ------*/
                     cloud_down = filter.StatisticalOutlierRemoval(cloud_down, 30, 2.0);
 
                     /*------ 4. Plane Segmentation ------*/
@@ -118,8 +115,8 @@ int32_t main(int32_t argc, char **argv) {
                         ERROR ++;
                     }
 
-                    auto cloud_other_down = filter.RandomSampling(cloud_other, num_of_points);
-                    
+                    /*------ 5. Save to shared memory ------*/
+                    auto cloud_other_down = filter.RandomSampling(cloud_other, num_of_points);                    
                     //std::cout <<  "Saving processed pcd to shared memory.." << std::endl;
                     cluon::data::TimeStamp ts = cluon::time::now();
                     shmSend->lock();
