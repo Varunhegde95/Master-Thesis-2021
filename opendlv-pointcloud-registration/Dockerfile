@@ -25,6 +25,9 @@ RUN apt-get update -y && \
     build-essential \
     software-properties-common
 
+RUN apt-get update
+RUN apt-get install -y libeigen3-dev
+
 RUN apt-get update -y && \
     apt-get install -y libeigen3-dev \
     libflann-dev \

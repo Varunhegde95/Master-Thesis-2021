@@ -20,6 +20,9 @@
 #include <algorithm>
 #include <string>
 
+// Eigen
+#include <Eigen/Dense>
+
 // PCL Library
 #include <pcl/point_types.h>
 #include <pcl/ModelCoefficients.h>
@@ -73,59 +76,6 @@ public:
 
     // Destructor
     ~Filters() = default;
-	
-	/**
-	 * @brief Pass through filter (the background can be removed if the background has a certain distance from the foreground)
-	 * 
-	 * @param cloud Input pointcloud
-	 * @param axis Choose filter axis [Example: "z"]
-	 * @param limits Set the filter constraints
-	 * @return Filtered pointcloud 
-	 */
-     typename pcl::PointCloud<PointT>::Ptr PassThroughFilter( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
-															 const std::string &axis, 
-															 const std::array<float, 2> &limits){
-		typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
-		pcl::PassThrough<PointT> passFilter;
-		passFilter.setInputCloud(cloud);  	 // Set input point cloud 
-		passFilter.setFilterFieldName(axis); // Set filter axis
-		passFilter.setFilterLimits(limits[0], limits[1]); // Set the filter acceptable range
-		passFilter.filter(*cloud_filtered);
-		std::cout << "[PassFilter " << axis << "(" << limits[0] << " -> " << limits[1] << ") ] " << " Original points: " 
-				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
-		return cloud_filtered;
-	}
-
-	/**
-	 * @brief Pick points inside/outside of the box
-	 * 
-	 * @param cloud Input pointcloud
-	 * @param min_point Box minimum corner point
-	 * @param max_point Box maximum corner point
-	 * @param setNegative true: choose points outside of the box, false: choose points inside of the box
-	 * @return Filtered pointcloud
-	 */
-	 typename pcl::PointCloud<PointT>::Ptr boxFilter( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
-													 const Eigen::Vector4f &min_point, 
-													 const Eigen::Vector4f &max_point, 
-													 const bool &setNegative = false){
-		pcl::CropBox<PointT> region(true);
-		std::vector<int> indices;
-		region.setMin(min_point);
-		region.setMax(max_point);
-		region.setInputCloud(cloud);
-		region.filter(indices);
-		pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
-		for (int index : indices)
-			inliers->indices.push_back(index);
-		pcl::ExtractIndices<PointT> extract;
-		// Extract the noise point cloud on the roof
-		extract.setInputCloud(cloud);
-		extract.setIndices(inliers);
-		extract.setNegative(setNegative);
-		extract.filter(*cloud);
-		return cloud;
-	}
 
 	/** 
 	 * @brief DownSample the dataset using a given voxel leaf size
@@ -186,6 +136,94 @@ public:
 				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
 		return cloud_filtered;
 	}
+};
+
+/*-------------------------------------------------------------------------------------*/
+
+template<typename PointT>
+class Registration{
+public:
+    // Constructor
+    Registration() = default;
+
+    // Destructor
+    ~Registration() = default;
+
+	/**
+	 * @brief 
+	 * 
+	 * @param cloud_source 
+	 * @param cloud_target 
+	 * @param init_guess 
+	 * @param tTransformationEpsilon 
+	 * @param StepSize 
+	 * @param Resolution 
+	 * @param MaxIteration 
+	 * @return std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f> 
+	 */
+	std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f> 
+	 NDT_Registration(const typename pcl::PointCloud<PointT>::Ptr &cloud_source,
+											const typename pcl::PointCloud<PointT>::Ptr &cloud_target, 
+											const Eigen::Matrix4f &init_guess,
+											const float &tTransformationEpsilon,
+											const float &StepSize,
+											const float &Resolution,
+											const int &MaxIteration){
+		typename pcl::PointCloud<PointT>::Ptr output(new pcl::PointCloud<PointT>);
+		pcl::NormalDistributionsTransform<PointT, PointT> NDT;
+		NDT.setTransformationEpsilon(tTransformationEpsilon);
+		NDT.setStepSize(StepSize);           
+		NDT.setResolution(Resolution);        
+		NDT.setMaximumIterations(MaxIteration);
+		NDT.setInputSource(cloud_source); 
+		NDT.setInputTarget(cloud_target); 
+		NDT.align(*output, init_guess);
+		Eigen::Matrix4f SourceToTarget = Eigen::Matrix4f::Identity();
+		if(NDT.hasConverged()){
+			std::cout << "NDP has converged, score is " << NDT.getFitnessScore () << std::endl;
+			std::cout << "Transformation matrix:" << std::endl;
+			SourceToTarget = NDT.getFinalTransformation();
+			std::cout << SourceToTarget << std::endl;
+			pcl::transformPointCloud(*cloud_source, *output, SourceToTarget);
+		}
+		return std::make_tuple(output, SourceToTarget);
+	}
+	
+	/**
+	 * @brief ICP point to point registration
+	 * 
+	 * @param cloud_source 
+	 * @param cloud_target 
+	 * @param init_transform 
+	 * @param MaxIteration 
+	 * @param Epsilon 
+	 * @param MaxCorrespondenceDistance 
+	 * @return std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f> 
+	 */
+	std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f> 
+ 	 ICP_Point2Point( const typename pcl::PointCloud<PointT>::Ptr &cloud_source,
+                      const typename pcl::PointCloud<PointT>::Ptr &cloud_target, 
+                      const Eigen::Matrix4f &init_transform,
+                      const int &MaxIteration,
+                      const float &Epsilon,
+                      const float &MaxCorrespondenceDistance){
+    typename pcl::PointCloud<PointT>::Ptr output(new pcl::PointCloud<PointT>);
+    typename pcl::IterativeClosestPoint<PointT, PointT> icp;
+    icp.setMaximumIterations(MaxIteration);
+    icp.setEuclideanFitnessEpsilon(Epsilon);  // Convergence condition: The smaller the accuracy, the slower the convergence
+	icp.setMaxCorrespondenceDistance(MaxCorrespondenceDistance);
+    icp.setInputSource(cloud_source);      
+    icp.setInputTarget(cloud_target); 
+    icp.align(*output, init_transform);  
+    Eigen::Matrix4f SourceToTarget = Eigen::Matrix4f::Identity();
+    if (icp.hasConverged()){
+        std::cout << "\nICP has converged, score is " << icp.getFitnessScore () << std::endl;
+        std::cout << "Transformation matrix:" << std::endl;
+        SourceToTarget = icp.getFinalTransformation();
+        std::cout << SourceToTarget << std::endl;
+    }
+    return std::make_tuple(output, SourceToTarget);
+}
 };
 
 /*-------------------------------------------------------------------------------------*/
