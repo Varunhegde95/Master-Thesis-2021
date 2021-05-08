@@ -69,13 +69,8 @@ int32_t main(int32_t argc, char **argv) {
                 if(VERBOSE)
                     std::cout << "Read shared memory PCD [" << NUM << "], size: " << cloud->points.size() << std::endl;
                 shmCloud->unlock();
-     
                 /*-------------------------------------------------------------------------------------*/
-                // auto dowm_timer = std::chrono::system_clock::now();
-                // auto cloud_down = filter.RandomSampling(cloud, 3000);
-
-
-                // timerCalculator(dowm_timer, "Every Frame");
+                
                 /*-------------------------------------------------------------------------------------*/
                 /*------ Visualization ------*/
                 if (VERBOSE){

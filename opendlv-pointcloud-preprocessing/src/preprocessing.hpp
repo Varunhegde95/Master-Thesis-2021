@@ -34,6 +34,7 @@
 #include <pcl/filters/extract_indices.h>             // Extract pointCloud according to indices
 #include <pcl/filters/crop_box.h>
 #include <pcl/filters/random_sample.h>
+#include <pcl/surface/mls.h>  // Upsampling
 
 // Segmentation
 #include <pcl/segmentation/sac_segmentation.h>
@@ -276,6 +277,34 @@ public:
 		rs.setSample(sample_number);
 		rs.filter(*cloud_filtered);
 		std::cout << "[RandomDownSampling] " << " Original points: " 
+				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
+		return cloud_filtered;
+	}
+	
+	/**
+	 * @brief Up sampling using *** to add points to the input point cloud
+	 * 
+	 * @param cloud Input pointcloud
+	 * @param KD_search_radius 
+	 * @param upsampling_radius 
+	 * @param upsampling_step_size 
+	 * @return pcl::PointCloud<PointT>::Ptr 
+	 */
+	typename pcl::PointCloud<PointT>::Ptr UpSampling(const typename pcl::PointCloud<PointT>::Ptr &cloud,
+													 const float KD_search_radius,
+													 const float upsampling_radius,
+													 const float upsampling_step_size){
+		typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
+		pcl::MovingLeastSquares<pcl::PointXYZ, pcl::PointXYZ> mls;
+		mls.setInputCloud(cloud);
+		pcl::search::KdTree<pcl::PointXYZ>::Ptr kdtree;
+    	mls.setSearchMethod(kdtree);
+		mls.setSearchRadius(0.03);
+		mls.setUpsamplingMethod(pcl::MovingLeastSquares<pcl::PointXYZ, pcl::PointXYZ>::SAMPLE_LOCAL_PLANE);
+		mls.setUpsamplingRadius(0.03);
+		mls.setUpsamplingStepSize(0.02);
+    	mls.process(*cloud_filtered);
+		std::cout << "[UpSampling] " << " Original points: " 
 				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
 		return cloud_filtered;
 	}
