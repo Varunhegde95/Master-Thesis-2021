@@ -68,7 +68,7 @@ int32_t main(int32_t argc, char **argv) {
             pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_now(new pcl::PointCloud<pcl::PointXYZ>);          // Point cloud this frame (now)
             pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_NDT(new pcl::PointCloud<pcl::PointXYZ>);          // NDT Registrated point cloud
             pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ICP(new pcl::PointCloud<pcl::PointXYZ>);          // ICP Registrated point cloud
-            pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ICP_output(new pcl::PointCloud<pcl::PointXYZ>); // ICP Registrated point cloud
+            pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ICP_output(new pcl::PointCloud<pcl::PointXYZ>);   // ICP Registrated point cloud
             pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_global_trans(new pcl::PointCloud<pcl::PointXYZ>); // Aligned cloud transfered into global coordinates
             pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_final(new pcl::PointCloud<pcl::PointXYZ>);        // Final result 
 
@@ -76,8 +76,7 @@ int32_t main(int32_t argc, char **argv) {
             Eigen::Matrix4f NDT_transMatrix = Eigen::Matrix4f::Identity ();           // NDT transformation
             Eigen::Matrix4f ICP_transMatrix = Eigen::Matrix4f::Identity ();
             Eigen::Matrix4f global_transMatrix = Eigen::Matrix4f::Identity ();
-
-            
+        
 
             while(od4.isRunning()){
                 shmCloud->wait();
@@ -87,25 +86,32 @@ int32_t main(int32_t argc, char **argv) {
                     std::cout << "Read shared memory PCD [" << NUM << "], size: " << cloud_read->points.size() << std::endl;
                 shmCloud->unlock();
                 // Statistical Outlier Removal
-                auto cloud_down = filter.StatisticalOutlierRemoval(cloud_read, 40, 2.0);
+                //auto cloud_down = filter.StatisticalOutlierRemoval(cloud_read, 40, 2.0);
+                // auto cloud_down = filter.RandomSampling(cloud_read, 6500);
+
+                /*----- TEST -----*/
+                auto cloud_valid = filter.InvalidPointsRemoval(cloud_read);
+                auto cloud_down = filter.RandomSampling(cloud_valid, 6500);
 
                 /*-------------------------------REGISTRATION------------------------------------------*/
                 auto frame_timer = std::chrono::system_clock::now();
                 if(NUM == 0){
                     std::cout << "Frame [" << NUM << "]: Set up <cloud_previous>." << std::endl;
-                    *cloud_previous = *cloud_read;
+                    *cloud_previous = *cloud_down;
                     *cloud_final += *cloud_previous;
                 }
                 else{
                     std::cout << "Registration start ..." << std::endl;
-                    *cloud_now = *cloud_read;   
+                    *cloud_now = *cloud_down;   
 
                     /*-------- 1. NDT registration --------*/
+                    std::cout << "NDT Registration" << std::endl;
                     // auto timer_NDT = std::chrono::system_clock::now(); // Start NDT timer
-                    // std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_Registration(cloud_previous, cloud_now, initial_guess_transMatrix, 1e-2, 0.2, 3.0, 10);
+                    std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_Registration(cloud_previous, cloud_now, initial_guess_transMatrix, 1e-2, 0.5, 1.0, 15);
                     // timerCalculator(timer_NDT, "NDT registration"); // Print time
 
                     /*-------- 2. ICP registration --------*/
+                    // std::cout << "ICP Registration" << std::endl;
                     // auto timer_ICP = std::chrono::system_clock::now(); // Start ICP timer
                     // std::tie(cloud_ICP, ICP_transMatrix) = registration.ICP_Point2Point(cloud_NDT, cloud_now, NDT_transMatrix, 100, 1e-7, 0.6);
                     // pcl::transformPointCloud (*cloud_now, *cloud_ICP_output, ICP_transMatrix.inverse() * NDT_transMatrix.inverse());
@@ -117,7 +123,7 @@ int32_t main(int32_t argc, char **argv) {
                     // std::cout << "Global Transform Matrix:\n" << global_transMatrix << std::endl;
 
                     /*-------- 4. Stitch aligned clouds --------*/
-                    *cloud_final += *cloud_global_trans;
+                    // *cloud_final += *cloud_global_trans;
                     *cloud_previous = *cloud_now;
                 }
                 /*-------------------------------------------------------------------------------------*/
@@ -128,7 +134,7 @@ int32_t main(int32_t argc, char **argv) {
                 }
                 if(DISPLAY){
                     viewer.removeAllPointClouds();
-                    visual.showPointcloud(viewer, cloud_read, 2, WHITE, "PCD Registration");
+                    visual.showPointcloud(viewer, cloud_NDT, 2, WHITE, "PCD Registration");
                     viewer.spinOnce();
                 }
                 NUM ++;

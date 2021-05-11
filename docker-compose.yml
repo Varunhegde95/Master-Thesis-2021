@@ -31,7 +31,7 @@ services:
         #- "kitti-replay"
         volumes:
         - /tmp:/tmp
-        command: "--cid=111 --freq=40 --name_read=123.pcd --name_send=234.pcd --display --verbose"
+        command: "--cid=111 --freq=100 --name_read=123.pcd --name_send=234.pcd --verbose"
 
     unscented-kalman-filter:
         container_name: unscented-kalman-filter
@@ -61,7 +61,7 @@ services:
         #- "pointcloud_processing"
         volumes:
         - /tmp:/tmp
-        command: "--cid=111 --freq=100 --name_processed=234.pcd --display --verbose"
+        command: "--cid=111 --freq=5 --name_processed=234.pcd --display --verbose"
 
     map-plotter:
         container_name: map-plotter

@@ -54,7 +54,7 @@ int32_t main(int32_t argc, char **argv) {
         
         std::cout << "Connecting to shared memory " << NAME_READ << std::endl;
         std::unique_ptr<cluon::SharedMemory> shmRead{new cluon::SharedMemory{NAME_READ}};
-        uint32_t num_of_points = 9000;
+        uint32_t num_of_points = 7500;
         std::unique_ptr<cluon::SharedMemory> shmSend{new cluon::SharedMemory{NAME_SEND, (uint32_t)num_of_points*16}}; // Create shared memory
 
         std::cout << "Set shared memory: " << shmSend->name() << " (" << shmSend->size() 

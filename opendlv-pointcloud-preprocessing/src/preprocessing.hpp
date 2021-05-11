@@ -280,33 +280,28 @@ public:
 				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
 		return cloud_filtered;
 	}
-	
+
 	/**
-	 * @brief Up sampling using *** to add points to the input point cloud
+	 * @brief Use 'pcl_isfinite()' detection to remove invalid points.
 	 * 
 	 * @param cloud Input pointcloud
-	 * @param KD_search_radius 
-	 * @param upsampling_radius 
-	 * @param upsampling_step_size 
 	 * @return pcl::PointCloud<PointT>::Ptr 
 	 */
-	typename pcl::PointCloud<PointT>::Ptr UpSampling(const typename pcl::PointCloud<PointT>::Ptr &cloud,
-													 const float KD_search_radius,
-													 const float upsampling_radius,
-													 const float upsampling_step_size){
-		typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
-		pcl::MovingLeastSquares<pcl::PointXYZ, pcl::PointXYZ> mls;
-		mls.setInputCloud(cloud);
-		pcl::search::KdTree<pcl::PointXYZ>::Ptr kdtree;
-    	mls.setSearchMethod(kdtree);
-		mls.setSearchRadius(0.03);
-		mls.setUpsamplingMethod(pcl::MovingLeastSquares<pcl::PointXYZ, pcl::PointXYZ>::SAMPLE_LOCAL_PLANE);
-		mls.setUpsamplingRadius(0.03);
-		mls.setUpsamplingStepSize(0.02);
-    	mls.process(*cloud_filtered);
-		std::cout << "[UpSampling] " << " Original points: " 
-				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
-		return cloud_filtered;
+	typename pcl::PointCloud<PointT>::Ptr InvalidPointsRemoval(const typename pcl::PointCloud<PointT>::Ptr &cloud){
+		int num = cloud->points.size();
+		pcl::PointCloud<pcl::PointXYZ>::iterator it = cloud->points.begin();
+		while (it != cloud->points.end()){
+			float x, y, z, rgb;
+			x = it->x;
+			y = it->y;
+			z = it->z;
+			if (!pcl_isfinite(x) || !pcl_isfinite(y) || !pcl_isfinite(z) || !pcl_isfinite(rgb))
+				it = cloud->points.erase(it);
+			else
+				++it;
+		}
+		std::cout << "Remove " << num - cloud->points.size() << " invalid points." << std::endl;
+		return cloud;
 	}
 };
 

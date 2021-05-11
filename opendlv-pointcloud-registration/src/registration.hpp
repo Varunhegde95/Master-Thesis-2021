@@ -136,6 +136,29 @@ public:
 				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
 		return cloud_filtered;
 	}
+
+	/**
+	 * @brief Use 'pcl_isfinite()' detection to remove invalid points.
+	 * 
+	 * @param cloud Input pointcloud
+	 * @return pcl::PointCloud<PointT>::Ptr 
+	 */
+	typename pcl::PointCloud<PointT>::Ptr InvalidPointsRemoval(const typename pcl::PointCloud<PointT>::Ptr &cloud){
+		int num = cloud->points.size();
+		pcl::PointCloud<pcl::PointXYZ>::iterator it = cloud->points.begin();
+		while (it != cloud->points.end()){
+			float x, y, z, rgb;
+			x = it->x;
+			y = it->y;
+			z = it->z;
+			if (!pcl_isfinite(x) || !pcl_isfinite(y) || !pcl_isfinite(z) || !pcl_isfinite(rgb))
+				it = cloud->points.erase(it);
+			else
+				++it;
+		}
+		std::cout << "Remove " << num - cloud->points.size() << " invalid points." << std::endl;
+		return cloud;
+	}
 };
 
 /*-------------------------------------------------------------------------------------*/
