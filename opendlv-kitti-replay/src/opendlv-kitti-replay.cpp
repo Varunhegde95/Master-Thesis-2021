@@ -86,8 +86,10 @@ int32_t main(int32_t argc, char **argv) {
 
                 if(NUM == 0)
                     sizecloud = (uint32_t) cloud_ptr->points.size()*0.9;
+                    
                 auto cloud = filter.PointComplement(cloud_ptr, sizecloud); // Resize the pointcloud
-                auto cloud_valid = filter.InvalidPointsRemoval(cloud);
+                auto cloud_valid = filter.RemoveNan(cloud);
+                cloud_valid = filter.InvalidPointsRemoval(cloud_valid);
 
                 if(!sharedMemory){
                     sharedMemory.reset(new cluon::SharedMemory{NAME, sizecloud*16});

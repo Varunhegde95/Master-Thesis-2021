@@ -334,6 +334,19 @@ public:
 		std::cout << "Remove " << num - cloud->points.size() << " invalid points." << std::endl;
 		return cloud;
 	}
+
+	/**
+	 * @brief Remove Nan points from the input point cloud
+	 * 
+	 * @param cloud Input point cloud
+	 * @return pcl::PointCloud<PointT>::Ptr 
+	 */
+	typename pcl::PointCloud<PointT>::Ptr RemoveNan(const typename pcl::PointCloud<PointT>::Ptr &cloud){
+		typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
+		std::vector<int> indices;
+  		pcl::removeNaNFromPointCloud(*cloud, *cloud_filtered, indices);
+		return cloud_filtered;
+	}
 };
 
 /*-------------------------------------------------------------------------------------*/
