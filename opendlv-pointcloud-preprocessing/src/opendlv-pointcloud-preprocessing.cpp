@@ -54,13 +54,13 @@ int32_t main(int32_t argc, char **argv) {
         
         std::cout << "Connecting to shared memory " << NAME_READ << std::endl;
         std::unique_ptr<cluon::SharedMemory> shmRead{new cluon::SharedMemory{NAME_READ}};
-        uint32_t num_of_points = 8000;
+        uint32_t num_of_points = 7000;
         std::unique_ptr<cluon::SharedMemory> shmSend{new cluon::SharedMemory{NAME_SEND, (uint32_t)num_of_points*16}}; // Create shared memory
 
         std::cout << "Set shared memory: " << shmSend->name() << " (" << shmSend->size() 
         << " bytes)." << std::endl;
 
-        if (shmRead && shmRead->valid() && shmSend  && shmSend->valid()) {
+        if (shmRead && shmRead->valid() ) {
             std::clog << argv[0] << ": Attached to shared PCD memory '" 
             << shmRead->name() << " (" << shmRead->size() 
             << " bytes)." << std::endl;
@@ -93,7 +93,7 @@ int32_t main(int32_t argc, char **argv) {
                     cloud_down = filter.boxFilter(cloud_down, roof_min, roof_max, true); // Remove roof outliers
                     
                     /*------ 3. Statistical Outlier Removal ------*/
-                    cloud_down = filter.StatisticalOutlierRemoval(cloud_down, 30, 2.0);
+                   // cloud_down = filter.StatisticalOutlierRemoval(cloud_down, 30, 2.0);
 
                     /*------ 4. Plane Segmentation ------*/
                     const float SENSOR_HEIGHT = 2;
@@ -103,18 +103,20 @@ int32_t main(int32_t argc, char **argv) {
                     // RANSAC Segmentation
                     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_road(new pcl::PointCloud<pcl::PointXYZ>());
                     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_other(new pcl::PointCloud<pcl::PointXYZ>());
+                    auto plane_timer = std::chrono::system_clock::now();
                     // std::tie(cloud_road, cloud_other) = segmentation.PlaneSegmentationRANSAC(cloud_down, RoughGroundPoints, 150, 0.2);
                     std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.3f); // SVD method
+                    timerCalculator(plane_timer, "Plane segmentation");
 
                     /*------ 5. Save to shared memory ------*/  
-                    auto cloud_other_down = filter.PointComplement(cloud_other, num_of_points); // Resize the pointcloud                
+                    auto cloud_other_down = filter.PointComplement(cloud_other, num_of_points); // Resize the pointcloud   
+                    std::cout << "Save PCD [" << NUM << "] to shared memory" << ", PCD point size: " << cloud_other_down->points.size() << std::endl;             
                     cluon::data::TimeStamp ts = cluon::time::now();
                     shmSend->lock();
                     shmSend->setTimeStamp(ts);
                     memcpy(shmSend->data(), static_cast<void const*>(cloud_other_down.get()), shmSend->size());
                     shmSend->unlock();
                     shmSend->notifyAll();
-                    std::cout << "Save PCD [" << NUM << "] to shared memory" << ", PCD point size: " << cloud_other_down->points.size() << std::endl;
 
                     /*------ 6. Visualization ------*/
                     if(VERBOSE){

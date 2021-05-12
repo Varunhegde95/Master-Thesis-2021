@@ -85,8 +85,9 @@ int32_t main(int32_t argc, char **argv) {
                 cloud_ptr = loadKitti(files_lidar, NUM);
 
                 if(NUM == 0)
-                    sizecloud = (uint32_t) cloud_ptr->points.size()*0.9;
-                    
+                    sizecloud = 100000;
+                // sizecloud = (uint32_t) cloud_ptr->points.size()*0.8;
+
                 auto cloud = filter.PointComplement(cloud_ptr, sizecloud); // Resize the pointcloud
                 auto cloud_valid = filter.RemoveNan(cloud);
                 cloud_valid = filter.InvalidPointsRemoval(cloud_valid);

@@ -80,19 +80,14 @@ int32_t main(int32_t argc, char **argv) {
 
             while(od4.isRunning()){
                 shmCloud->wait();
+                //std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 shmCloud->lock();
                 memcpy(&(cloud_read->points[0]), shmCloud->data(), shmCloud->size());
+                shmCloud->unlock();
                 if(VERBOSE)
                     std::cout << "Read shared memory PCD [" << NUM << "], size: " << cloud_read->points.size() << std::endl;
-                shmCloud->unlock();
-                // Statistical Outlier Removal
-                //auto cloud_down = filter.StatisticalOutlierRemoval(cloud_read, 40, 2.0);
-                // auto cloud_down = filter.RandomSampling(cloud_read, 6500);
 
-                /*----- TEST -----*/
-                auto cloud_valid = filter.InvalidPointsRemoval(cloud_read);
-                auto cloud_down = filter.PointComplement(cloud_valid, 6500);
-               // auto cloud_down = filter.VoxelGridDownSampling(cloud_valid, 0.5f);
+                auto cloud_down = filter.PointComplement(cloud_read, 6000);
 
                 /*-------------------------------REGISTRATION------------------------------------------*/
                 auto frame_timer = std::chrono::system_clock::now();
@@ -108,7 +103,7 @@ int32_t main(int32_t argc, char **argv) {
                     /*-------- 1. NDT registration --------*/
                     std::cout << "NDT Registration" << std::endl;
                     // auto timer_NDT = std::chrono::system_clock::now(); // Start NDT timer
-                    std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_Registration(cloud_previous, cloud_now, initial_guess_transMatrix, 1e-2, 0.5, 1.0, 10);
+                    std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_Registration(cloud_previous, cloud_now, initial_guess_transMatrix, 1e-2, 0.5, 1.0, 15);
                     // timerCalculator(timer_NDT, "NDT registration"); // Print time
 
                     /*-------- 2. ICP registration --------*/
@@ -135,7 +130,7 @@ int32_t main(int32_t argc, char **argv) {
                 }
                 if(DISPLAY){
                     viewer.removeAllPointClouds();
-                    visual.showPointcloud(viewer, cloud_NDT, 2, WHITE, "PCD Registration");
+                    visual.showPointcloud(viewer, cloud_read, 2, WHITE, "PCD Registration");
                     viewer.spinOnce();
                 }
                 NUM ++;

@@ -513,6 +513,8 @@ public:
 				cloud_other -> points.push_back(original_cloud->points[i]);
 			}
 		}
+		std::cout << "[Plane Estimation] Plane points: " << cloud_plane->points.size() << ", other points: " 
+				<< cloud_other->points.size() << std::endl;
 		return std::make_tuple(cloud_plane, cloud_other);
 	}
 };

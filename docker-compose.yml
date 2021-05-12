@@ -45,23 +45,23 @@ services:
         - "kitti-replay"
         command: "--cid=111 --freq=10 --imu-freq=10 --gps-freq=10 --display --verbose"
 
-    #pointcloud_registration:
-    #    container_name: pointcloud_registration
-    #    build:
-    #        context: ./opendlv-pointcloud-registration
-    #        dockerfile: Dockerfile
-    #    image: opendlv-pointcloud-registration:v0.1
-    #    runtime: nvidia
-    #    ipc: "host"
-    #    network_mode: "host"
-    #    environment:
-    #    - NVIDIA_VISIBLE_DEVICES=all
-    #    - DISPLAY=${DISPLAY}
-    #    #depends_on:
-    #    #- "pointcloud_processing"
-    #    volumes:
-    #    - /tmp:/tmp
-    #    command: "--cid=111 --freq=10 --name_processed=234.pcd --display --verbose"
+    pointcloud_registration:
+        container_name: pointcloud_registration
+        build:
+            context: ./opendlv-pointcloud-registration
+            dockerfile: Dockerfile
+        image: opendlv-pointcloud-registration:v0.1
+        runtime: nvidia
+        ipc: "host"
+        network_mode: "host"
+        environment:
+        - NVIDIA_VISIBLE_DEVICES=all
+        - DISPLAY=${DISPLAY}
+        #depends_on:
+        #- "pointcloud_processing"
+        volumes:
+        - /tmp:/tmp
+        command: "--cid=111 --freq=10 --name_processed=234.pcd --display --verbose"
 
     map-plotter:
         container_name: map-plotter
