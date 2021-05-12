@@ -74,21 +74,20 @@ int32_t main(int32_t argc, char **argv) {
             timerCalculator(timer_oxts, "Loading all KITTI oxts data");
 
             int16_t NUM = 0;
+            uint32_t sizecloud = 0;
 
-            auto atFrequency{[&VERBOSE, &od4, &sharedMemory, &NAME, &filter, &oxts_data, &files_lidar, &IDSENDER, &NUM]() -> bool{
+            auto atFrequency{[&VERBOSE, &od4, &sharedMemory, &NAME, &filter, &oxts_data, &files_lidar, &IDSENDER, &NUM, &sizecloud]() -> bool{
                 cluon::data::TimeStamp sampleTime{cluon::time::now()};
                 auto oxts_reading = oxts_data[NUM];
 
                 // Copy point cloud into shared memory
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>);
                 cloud_ptr = loadKitti(files_lidar, NUM);
-                //uint32_t sizecloud = sizeof(cloud_ptr) + cloud_ptr->points.size();
-                uint32_t sizecloud = 100000;
-                //cloud_ptr->points.resize(sizecloud);
-                auto cloud = filter.RandomSampling(cloud_ptr, sizecloud); // Resize the pointcloud to 100000 points.
 
-                std::cout << "cloud point size: " << cloud->points.size() << std::endl;
-                std::cout << "Shm sizecloud: " << sizecloud << std::endl;
+                if(NUM == 0)
+                    sizecloud = (uint32_t) cloud_ptr->points.size()*0.9;
+                auto cloud = filter.PointComplement(cloud_ptr, sizecloud); // Resize the pointcloud
+                auto cloud_valid = filter.InvalidPointsRemoval(cloud);
 
                 if(!sharedMemory){
                     sharedMemory.reset(new cluon::SharedMemory{NAME, sizecloud*16});
@@ -127,10 +126,10 @@ int32_t main(int32_t argc, char **argv) {
                     cluon::data::TimeStamp ts = cluon::time::now();
                     sharedMemory->lock();
                     sharedMemory->setTimeStamp(ts);
-                    memcpy(sharedMemory->data(), static_cast<void const*>(cloud.get()), sharedMemory->size());
+                    memcpy(sharedMemory->data(), static_cast<void const*>(cloud_valid.get()), sharedMemory->size());
                     sharedMemory->unlock();
 	                sharedMemory->notifyAll();
-                    //std::cout << "Save PCD [" << NUM << "] to shared memory" << ", data size: " << sharedMemory->size() << " bytes." << std::endl;
+                    std::cout << "Save PCD [" << NUM << "] to shared memory: " << cloud_valid->points.size() << ", points" << ", data size: " << sharedMemory->size() << " bytes." << std::endl;
                 }
                 NUM ++;
             }};

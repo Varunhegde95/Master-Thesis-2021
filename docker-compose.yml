@@ -10,7 +10,7 @@ services:
         network_mode: "host"
         ipc: "host"
         volumes:
-        - ${HOME}/Learning_PCL/Test_data/2011_09_26/2011_09_26_drive_0005_sync:/opt/recordings
+        - ${HOME}/Learning_PCL/Test_data/2011_09_26/2011_09_26_drive_0117_sync:/opt/recordings
         - /tmp:/tmp
         network_mode: "host"
         command: "--cid=111 --freq=10 --name=123.pcd /opt/recordings/ --verbose --id-sender=100"
@@ -31,7 +31,7 @@ services:
         #- "kitti-replay"
         volumes:
         - /tmp:/tmp
-        command: "--cid=111 --freq=100 --name_read=123.pcd --name_send=234.pcd --verbose"
+        command: "--cid=111 --freq=100 --name_read=123.pcd --name_send=234.pcd --display --verbose"
 
     unscented-kalman-filter:
         container_name: unscented-kalman-filter
@@ -45,23 +45,23 @@ services:
         - "kitti-replay"
         command: "--cid=111 --freq=10 --imu-freq=10 --gps-freq=10 --display --verbose"
 
-    pointcloud_registration:
-        container_name: pointcloud_registration
-        build:
-            context: ./opendlv-pointcloud-registration
-            dockerfile: Dockerfile
-        image: opendlv-pointcloud-registration:v0.1
-        runtime: nvidia
-        ipc: "host"
-        network_mode: "host"
-        environment:
-        - NVIDIA_VISIBLE_DEVICES=all
-        - DISPLAY=${DISPLAY}
-        #depends_on:
-        #- "pointcloud_processing"
-        volumes:
-        - /tmp:/tmp
-        command: "--cid=111 --freq=5 --name_processed=234.pcd --display --verbose"
+    #pointcloud_registration:
+    #    container_name: pointcloud_registration
+    #    build:
+    #        context: ./opendlv-pointcloud-registration
+    #        dockerfile: Dockerfile
+    #    image: opendlv-pointcloud-registration:v0.1
+    #    runtime: nvidia
+    #    ipc: "host"
+    #    network_mode: "host"
+    #    environment:
+    #    - NVIDIA_VISIBLE_DEVICES=all
+    #    - DISPLAY=${DISPLAY}
+    #    #depends_on:
+    #    #- "pointcloud_processing"
+    #    volumes:
+    #    - /tmp:/tmp
+    #    command: "--cid=111 --freq=10 --name_processed=234.pcd --display --verbose"
 
     map-plotter:
         container_name: map-plotter

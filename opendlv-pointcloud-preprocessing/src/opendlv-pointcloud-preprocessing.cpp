@@ -54,7 +54,7 @@ int32_t main(int32_t argc, char **argv) {
         
         std::cout << "Connecting to shared memory " << NAME_READ << std::endl;
         std::unique_ptr<cluon::SharedMemory> shmRead{new cluon::SharedMemory{NAME_READ}};
-        uint32_t num_of_points = 7500;
+        uint32_t num_of_points = 8000;
         std::unique_ptr<cluon::SharedMemory> shmSend{new cluon::SharedMemory{NAME_SEND, (uint32_t)num_of_points*16}}; // Create shared memory
 
         std::cout << "Set shared memory: " << shmSend->name() << " (" << shmSend->size() 
@@ -66,7 +66,6 @@ int32_t main(int32_t argc, char **argv) {
             << " bytes)." << std::endl;
         
             int16_t NUM = 0;
-            int16_t ERROR = 0;
             pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPCL(new pcl::PointCloud<pcl::PointXYZ>);
             cloudPCL->resize(shmRead->size()/16);
 
@@ -77,23 +76,20 @@ int32_t main(int32_t argc, char **argv) {
                 if(VERBOSE)
                     std::cout << "Read shared memory PCD [" << NUM << "], size: " << cloudPCL->points.size() << std::endl;
                 shmRead->unlock();
-                // if(DISPLAY){
-                //     viewer.removeAllPointClouds();
-                // }
+                auto cloud_valid = filter.InvalidPointsRemoval(cloudPCL); // Remove invalid points
 
                 if(NUM % 5 == 0){
                     auto frame_timer = std::chrono::system_clock::now();
                     /*------ 1. Down Sampling ------*/
-                    auto cloud_down = filter.RandomSampling(cloudPCL, 40000);
-                    //timerCalculator(frame_timer, "Down Sampling");
+                    auto cloud_down = filter.RandomSampling(cloud_valid, (uint32_t) cloudPCL->points.size()*0.5);  // Down sampling the reading pointcloud
 
                     /*------ 2. Crop Box Filter [Remove roof] ------*/
                     const Eigen::Vector4f min_point(-40, -25, -1, 1);
                     const Eigen::Vector4f max_point(40, 25, 4, 1);
                     cloud_down = filter.boxFilter(cloud_down, min_point, max_point); //Distance Crop Box
 
-                    const Eigen::Vector4f roof_min(-1.5, -1.7, -1, 1);
-                    const Eigen::Vector4f roof_max(2.6, 1.7, -0.4, 1);
+                    const Eigen::Vector4f roof_min(-1.5, -1.8, -1, 1);
+                    const Eigen::Vector4f roof_max(2.6, 1.8, -0.4, 1);
                     cloud_down = filter.boxFilter(cloud_down, roof_min, roof_max, true); // Remove roof outliers
                     
                     /*------ 3. Statistical Outlier Removal ------*/
@@ -107,17 +103,11 @@ int32_t main(int32_t argc, char **argv) {
                     // RANSAC Segmentation
                     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_road(new pcl::PointCloud<pcl::PointXYZ>());
                     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_other(new pcl::PointCloud<pcl::PointXYZ>());
-                    std::tie(cloud_road, cloud_other) = segmentation.PlaneSegmentationRANSAC(cloud_down, RoughGroundPoints, 150, 0.2);
-                    //std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.3f); // SVD method
-                    
-                    if(cloud_other->points.size() <= num_of_points){
-                        std::cerr << "Point cloud too small ! ! " << std::endl;
-                        ERROR ++;
-                    }
+                    // std::tie(cloud_road, cloud_other) = segmentation.PlaneSegmentationRANSAC(cloud_down, RoughGroundPoints, 150, 0.2);
+                    std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.3f); // SVD method
 
-                    /*------ 5. Save to shared memory ------*/
-                    auto cloud_other_down = filter.RandomSampling(cloud_other, num_of_points);                    
-                    //std::cout <<  "Saving processed pcd to shared memory.." << std::endl;
+                    /*------ 5. Save to shared memory ------*/  
+                    auto cloud_other_down = filter.PointComplement(cloud_other, num_of_points); // Resize the pointcloud                
                     cluon::data::TimeStamp ts = cluon::time::now();
                     shmSend->lock();
                     shmSend->setTimeStamp(ts);
@@ -130,11 +120,9 @@ int32_t main(int32_t argc, char **argv) {
                     if(VERBOSE){
                         std::cout << "Frame (" << NUM << "), ";
                         timerCalculator(frame_timer, "Every Frame");
-                        std::cout << "Error number: " << ERROR << std::endl;
                     }
                     // if(DISPLAY){
                     //     viewer.removeAllPointClouds();
-                    //     //std::cout << "PCD point size: " << cloud_down->points.size() << std::endl;
                     //     visual.showPointcloud(viewer, cloud_other_down, 2, GREEN, "PCD Preprocessing");
                     //     //visual.showPointcloud(viewer, cloud_road, 2, RED, "PCD road");
                     //     viewer.spinOnce();

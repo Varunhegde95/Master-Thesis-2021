@@ -177,59 +177,6 @@ public:
 
     // Destructor
     ~Filters() = default;
-	
-	/**
-	 * @brief Pass through filter (the background can be removed if the background has a certain distance from the foreground)
-	 * 
-	 * @param cloud Input pointcloud
-	 * @param axis Choose filter axis [Example: "z"]
-	 * @param limits Set the filter constraints
-	 * @return Filtered pointcloud 
-	 */
-     typename pcl::PointCloud<PointT>::Ptr PassThroughFilter( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
-															 const std::string &axis, 
-															 const std::array<float, 2> &limits){
-		typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
-		pcl::PassThrough<PointT> passFilter;
-		passFilter.setInputCloud(cloud);  	 // Set input point cloud 
-		passFilter.setFilterFieldName(axis); // Set filter axis
-		passFilter.setFilterLimits(limits[0], limits[1]); // Set the filter acceptable range
-		passFilter.filter(*cloud_filtered);
-		std::cout << "[PassFilter " << axis << "(" << limits[0] << " -> " << limits[1] << ") ] " << " Original points: " 
-				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
-		return cloud_filtered;
-	}
-
-	/**
-	 * @brief Pick points inside/outside of the box
-	 * 
-	 * @param cloud Input pointcloud
-	 * @param min_point Box minimum corner point
-	 * @param max_point Box maximum corner point
-	 * @param setNegative true: choose points outside of the box, false: choose points inside of the box
-	 * @return Filtered pointcloud
-	 */
-	 typename pcl::PointCloud<PointT>::Ptr boxFilter( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
-													 const Eigen::Vector4f &min_point, 
-													 const Eigen::Vector4f &max_point, 
-													 const bool &setNegative = false){
-		pcl::CropBox<PointT> region(true);
-		std::vector<int> indices;
-		region.setMin(min_point);
-		region.setMax(max_point);
-		region.setInputCloud(cloud);
-		region.filter(indices);
-		pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
-		for (int index : indices)
-			inliers->indices.push_back(index);
-		pcl::ExtractIndices<PointT> extract;
-		// Extract the noise point cloud on the roof
-		extract.setInputCloud(cloud);
-		extract.setIndices(inliers);
-		extract.setNegative(setNegative);
-		extract.filter(*cloud);
-		return cloud;
-	}
 
 	/** 
 	 * @brief DownSample the dataset using a given voxel leaf size
@@ -251,28 +198,6 @@ public:
 	}
 
 	/**
-	 * @brief Statistical Outlier Removal
-	 * 
-	 * @param cloud Input pointcloud
-	 * @param meanK Set the number of nearest neighbors to use for mean distance estimation.
-	 * @param StddevMulThresh Threshold for determining outliers [smaller -> more stringent]
-	 * @return Filtered pointcloud
-	 */
-     typename pcl::PointCloud<PointT>::Ptr StatisticalOutlierRemoval( const typename pcl::PointCloud<PointT>::Ptr &cloud, 
-																	  const int &meanK, 
-																	  const double &StddevMulThresh ){
-    	typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
-		pcl::StatisticalOutlierRemoval<PointT> sor;
-		sor.setInputCloud(cloud);
-		sor.setMeanK(meanK); 
-		sor.setStddevMulThresh(StddevMulThresh); 
-		sor.filter(*cloud_filtered);
-		std::cout << "[StatisticalOutlierRemoval] " << " Original points: " 
-				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
-		return cloud_filtered;
-	}  
-
-	/**
 	 * @brief Random down sampling to size 'sample_number'
 	 * 
 	 * @param cloud Input pointcloud
@@ -289,6 +214,60 @@ public:
 		std::cout << "[RandomDownSampling] " << " Original points: " 
 				<< cloud->points.size() <<  ", Filtered points: " << cloud_filtered->points.size() << std::endl;
 		return cloud_filtered;
+	}
+
+	/**
+	 * @brief Set desired point number and change input pointcloud
+	 * 
+	 * @param cloud Input cloud
+	 * @param sample_number Target points number
+	 * @return pcl::PointCloud<PointT>::Ptr 
+	 */
+	typename pcl::PointCloud<PointT>::Ptr PointComplement(const typename pcl::PointCloud<PointT>::Ptr &cloud,
+														  const uint32_t sample_number){
+		int num = sample_number - cloud->points.size();
+		if(num > 0){
+			pcl::PointXYZ point;
+			point.x = 0;
+			point.y = 0;
+			point.z = 0;
+			for(int i = 0; i < num; i++){
+				cloud->points.push_back(point);
+			}
+			std::cout << "[Point complement]: " << " Original points: " 
+				<< sample_number - num <<  ", Filtered points: " << cloud->points.size() << std::endl;
+			return cloud;
+		}
+		else if (num == 0)
+			return cloud;
+		else{
+			typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
+			cloud_filtered = RandomSampling(cloud, sample_number);
+			return cloud_filtered;
+		}
+	}
+
+    	/**
+	 * @brief Use 'pcl_isfinite()' detection to remove invalid points.
+	 * 
+	 * @param cloud Input pointcloud
+	 * @return pcl::PointCloud<PointT>::Ptr 
+	 */
+	typename pcl::PointCloud<PointT>::Ptr InvalidPointsRemoval(const typename pcl::PointCloud<PointT>::Ptr &cloud){
+		int num = cloud->points.size();
+		pcl::PointCloud<pcl::PointXYZ>::iterator it = cloud->points.begin();
+		while (it != cloud->points.end()){
+			float x, y, z, rgb;
+			x = it->x;
+			y = it->y;
+			z = it->z;
+			if (!pcl_isfinite(x) || !pcl_isfinite(y) || !pcl_isfinite(z) || !pcl_isfinite(rgb))
+				it = cloud->points.erase(it);
+			else
+				++it;
+		}
+		std::cout << "Remove " << num - cloud->points.size() << " invalid points." << std::endl;
+		return cloud;
 	}
 };
 

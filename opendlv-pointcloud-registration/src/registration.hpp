@@ -138,6 +138,37 @@ public:
 	}
 
 	/**
+	 * @brief Set desired point number and change input pointcloud
+	 * 
+	 * @param cloud Input cloud
+	 * @param sample_number Target points number
+	 * @return pcl::PointCloud<PointT>::Ptr 
+	 */
+	typename pcl::PointCloud<PointT>::Ptr PointComplement(const typename pcl::PointCloud<PointT>::Ptr &cloud,
+														  const uint32_t sample_number){
+		int num = sample_number - cloud->points.size();
+		if(num > 0){
+			pcl::PointXYZ point;
+			point.x = 0;
+			point.y = 0;
+			point.z = 0;
+			for(int i = 0; i < num; i++){
+				cloud->points.push_back(point);
+			}
+			std::cout << "[Point complement]: " << " Original points: " 
+				<< sample_number - num <<  ", Filtered points: " << cloud->points.size() << std::endl;
+			return cloud;
+		}
+		else if (num == 0)
+			return cloud;
+		else{
+			typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
+			cloud_filtered = RandomSampling(cloud, sample_number);
+			return cloud_filtered;
+		}
+	}
+	
+	/**
 	 * @brief Use 'pcl_isfinite()' detection to remove invalid points.
 	 * 
 	 * @param cloud Input pointcloud

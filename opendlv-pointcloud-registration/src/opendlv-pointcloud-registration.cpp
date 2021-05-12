@@ -91,7 +91,8 @@ int32_t main(int32_t argc, char **argv) {
 
                 /*----- TEST -----*/
                 auto cloud_valid = filter.InvalidPointsRemoval(cloud_read);
-                auto cloud_down = filter.RandomSampling(cloud_valid, 6500);
+                auto cloud_down = filter.PointComplement(cloud_valid, 6500);
+               // auto cloud_down = filter.VoxelGridDownSampling(cloud_valid, 0.5f);
 
                 /*-------------------------------REGISTRATION------------------------------------------*/
                 auto frame_timer = std::chrono::system_clock::now();
@@ -107,7 +108,7 @@ int32_t main(int32_t argc, char **argv) {
                     /*-------- 1. NDT registration --------*/
                     std::cout << "NDT Registration" << std::endl;
                     // auto timer_NDT = std::chrono::system_clock::now(); // Start NDT timer
-                    std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_Registration(cloud_previous, cloud_now, initial_guess_transMatrix, 1e-2, 0.5, 1.0, 15);
+                    std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_Registration(cloud_previous, cloud_now, initial_guess_transMatrix, 1e-2, 0.5, 1.0, 10);
                     // timerCalculator(timer_NDT, "NDT registration"); // Print time
 
                     /*-------- 2. ICP registration --------*/
