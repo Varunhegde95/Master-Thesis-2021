@@ -80,14 +80,14 @@ int32_t main(int32_t argc, char **argv) {
 
             while(od4.isRunning()){
                 shmCloud->wait();
-                //std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                // std::this_thread::sleep_for(std::chrono::milliseconds(2));
                 shmCloud->lock();
                 memcpy(&(cloud_read->points[0]), shmCloud->data(), shmCloud->size());
                 shmCloud->unlock();
                 if(VERBOSE)
                     std::cout << "Read shared memory PCD [" << NUM << "], size: " << cloud_read->points.size() << std::endl;
 
-                auto cloud_down = filter.PointComplement(cloud_read, 6000);
+                auto cloud_down = filter.PointComplement(cloud_read, 5000);
 
                 /*-------------------------------REGISTRATION------------------------------------------*/
                 auto frame_timer = std::chrono::system_clock::now();
@@ -103,7 +103,7 @@ int32_t main(int32_t argc, char **argv) {
                     /*-------- 1. NDT registration --------*/
                     std::cout << "NDT Registration" << std::endl;
                     // auto timer_NDT = std::chrono::system_clock::now(); // Start NDT timer
-                    std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_Registration(cloud_previous, cloud_now, initial_guess_transMatrix, 1e-2, 0.5, 1.0, 15);
+                    // std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_Registration(cloud_previous, cloud_now, initial_guess_transMatrix, 1e-2, 0.5, 1.0, 15);
                     // timerCalculator(timer_NDT, "NDT registration"); // Print time
 
                     /*-------- 2. ICP registration --------*/

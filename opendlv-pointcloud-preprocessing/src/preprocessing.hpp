@@ -20,6 +20,9 @@
 #include <algorithm>
 #include <string>
 
+// Eigen
+#include <Eigen/Dense>
+
 // PCL Library
 #include <pcl/point_types.h>
 #include <pcl/ModelCoefficients.h>
@@ -39,6 +42,13 @@
 // Segmentation
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
+
+// Registration
+#include <pcl/registration/icp.h>        // ICP point-to-point
+#include <pcl/registration/icp_nl.h>     // ICP Nolinear point-to-plane
+#include <pcl/registration/gicp.h>       // ICP plane-to-plane
+#include <pcl/registration/ndt.h>        // NDT Registration
+#include <pcl/registration/transforms.h> // Transformation matrix 
 
 // Visualization
 #include <pcl/visualization/pcl_visualizer.h>
@@ -147,7 +157,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr
  * @param start_time Choose starting Timer
  * @param function_name Function name shown in terminal
  */
-void 
+double 
  timerCalculator (const std::chrono::_V2::system_clock::time_point &start_time,
                                 const std::string &function_name){
     auto end_time = std::chrono::system_clock::now();
@@ -155,6 +165,7 @@ void
     double time_passed = (double) duration.count() * 
             std::chrono::microseconds::period::num / std::chrono::microseconds::period::den;
     std::cout << "[--Timer--] " << function_name <<" time used: " << time_passed << " [s]." << std::endl;
+	return time_passed;
 }
 
 /*-------------------------------------------------------------------------------------*/
@@ -291,11 +302,11 @@ public:
 	typename pcl::PointCloud<PointT>::Ptr PointComplement(const typename pcl::PointCloud<PointT>::Ptr &cloud,
 														  const uint32_t sample_number){
 		int num = sample_number - cloud->points.size();
-		if(num > 0){
+		if(num >= 0){
 			pcl::PointXYZ point;
-			point.x = 0;
-			point.y = 0;
-			point.z = 0;
+			point.x = 0.0f;
+			point.y = 0.0f;
+			point.z = 0.0f;
 			for(int i = 0; i < num; i++){
 				cloud->points.push_back(point);
 			}
@@ -303,8 +314,6 @@ public:
 				<< sample_number - num <<  ", Filtered points: " << cloud->points.size() << std::endl;
 			return cloud;
 		}
-		else if (num == 0)
-			return cloud;
 		else{
 			typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());
 			cloud_filtered = RandomSampling(cloud, sample_number);
@@ -519,6 +528,93 @@ public:
 	}
 };
 
+/*-------------------------------------------------------------------------------------*/
+
+template<typename PointT>
+class Registration{
+public:
+    // Constructor
+    Registration() = default;
+
+    // Destructor
+    ~Registration() = default;
+
+	/**
+	 * @brief 
+	 * 
+	 * @param cloud_source 
+	 * @param cloud_target 
+	 * @param init_guess 
+	 * @param tTransformationEpsilon 
+	 * @param StepSize 
+	 * @param Resolution 
+	 * @param MaxIteration 
+	 * @return std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f> 
+	 */
+	std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f> 
+	 NDT_Registration(const typename pcl::PointCloud<PointT>::Ptr &cloud_source,
+											const typename pcl::PointCloud<PointT>::Ptr &cloud_target, 
+											const Eigen::Matrix4f &init_guess,
+											const float &tTransformationEpsilon,
+											const float &StepSize,
+											const float &Resolution,
+											const int &MaxIteration){
+		typename pcl::PointCloud<PointT>::Ptr output(new pcl::PointCloud<PointT>);
+		pcl::NormalDistributionsTransform<PointT, PointT> NDT;
+		NDT.setTransformationEpsilon(tTransformationEpsilon);
+		NDT.setStepSize(StepSize);           
+		NDT.setResolution(Resolution);        
+		NDT.setMaximumIterations(MaxIteration);
+		NDT.setInputSource(cloud_source); 
+		NDT.setInputTarget(cloud_target); 
+		NDT.align(*output, init_guess);
+		Eigen::Matrix4f SourceToTarget(Eigen::Matrix4f::Identity());
+		if(NDT.hasConverged()){
+			std::cout << "NDP has converged, score is " << NDT.getFitnessScore () << std::endl;
+			std::cout << "Transformation matrix:" << std::endl;
+			SourceToTarget = NDT.getFinalTransformation();
+			std::cout << SourceToTarget << std::endl;
+			pcl::transformPointCloud(*cloud_source, *output, SourceToTarget);
+		}
+		return std::make_tuple(output, SourceToTarget);
+	}
+	
+	/**
+	 * @brief ICP point to point registration
+	 * 
+	 * @param cloud_source 
+	 * @param cloud_target 
+	 * @param init_transform 
+	 * @param MaxIteration 
+	 * @param Epsilon 
+	 * @param MaxCorrespondenceDistance 
+	 * @return std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f> 
+	 */
+	std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f> 
+ 	 ICP_Point2Point( const typename pcl::PointCloud<PointT>::Ptr &cloud_source,
+                      const typename pcl::PointCloud<PointT>::Ptr &cloud_target, 
+                      const Eigen::Matrix4f &init_transform,
+                      const int &MaxIteration,
+                      const float &Epsilon,
+                      const float &MaxCorrespondenceDistance){
+    typename pcl::PointCloud<PointT>::Ptr output(new pcl::PointCloud<PointT>);
+    typename pcl::IterativeClosestPoint<PointT, PointT> icp;
+    icp.setMaximumIterations(MaxIteration);
+    icp.setEuclideanFitnessEpsilon(Epsilon);  // Convergence condition: The smaller the accuracy, the slower the convergence
+	icp.setMaxCorrespondenceDistance(MaxCorrespondenceDistance);
+    icp.setInputSource(cloud_source);      
+    icp.setInputTarget(cloud_target); 
+    icp.align(*output, init_transform);  
+    Eigen::Matrix4f SourceToTarget (Eigen::Matrix4f::Identity());
+    if (icp.hasConverged()){
+        std::cout << "\nICP has converged, score is " << icp.getFitnessScore () << std::endl;
+        std::cout << "Transformation matrix:" << std::endl;
+        SourceToTarget = icp.getFinalTransformation();
+        std::cout << SourceToTarget << std::endl;
+    }
+    return std::make_tuple(output, SourceToTarget);
+}
+};
 
 /*-------------------------------------------------------------------------------------*/
 
@@ -543,7 +639,7 @@ public:
 					 const CameraAngle &camera_angle){
 		viewer.setBackgroundColor(background_color.R, background_color.G, background_color.B); // Set black background
 		viewer.initCameraParameters();
-		const int distance = 90;
+		const int distance = 100;
 		if(camera_angle != FPS)
 			viewer.addCoordinateSystem(1.0);
 		switch(camera_angle) {
