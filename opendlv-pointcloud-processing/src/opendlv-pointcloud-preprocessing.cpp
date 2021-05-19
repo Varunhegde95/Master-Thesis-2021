@@ -61,7 +61,13 @@ int32_t main(int32_t argc, char **argv) {
         Eigen::Matrix4f NDT_transMatrix (Eigen::Matrix4f::Identity());           // NDT transformation
         Eigen::Matrix4f ICP_transMatrix (Eigen::Matrix4f::Identity());
         Eigen::Matrix4f global_transMatrix (Eigen::Matrix4f::Identity());
-            
+
+        Eigen::Matrix4f global_transMatrix_lidar (Eigen::Matrix4f::Identity());            // Transform the lidar on the gps trajectory
+        Eigen::Matrix4f Global_GPS_trans_init (Eigen::Matrix4f::Identity());
+        Eigen::Matrix4f GPS_IMU_to_Velodyne_kitti (Eigen::Matrix4f::Identity());           // Calibration transform the lidar to IMU/GPS
+        Eigen::Matrix4f GPS_IMU_to_Velodyne_kitti_gt_trans (Eigen::Matrix4f::Identity());  // Calibration transform the lidar to IMU/GPS (rotaion and y direction only)
+        Eigen::Matrix4f GPS_IMU_to_Velodyne_kitti_inv (Eigen::Matrix4f::Identity());       // Calibration transform the  IMU/GPS to lidar 
+
         //Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
         
@@ -126,34 +132,32 @@ int32_t main(int32_t argc, char **argv) {
                     *cloud_final += *cloud_previous;
                 }
                 else{
-                    if(NUM%5 == 0){
-                        std::cout << "Registration start ..." << std::endl;
-                        *cloud_now = *cloud_other;   
+                    std::cout << "Registration start ..." << std::endl;
+                    *cloud_now = *cloud_other;   
 
-                        /*----- [1] NDT Registration -----*/
-                        auto timer_registration = std::chrono::system_clock::now(); // Start NDT timer
-                        std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_OMP(cloud_previous, cloud_now, initial_guess_transMatrix, 2.0);
-                        timerCalculator(timer_registration, "NDT-OMP");
+                    /*----- [1] NDT Registration -----*/
+                    auto timer_registration = std::chrono::system_clock::now(); // Start NDT timer
+                    std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_OMP(cloud_previous, cloud_now, initial_guess_transMatrix, 2.0);
+                    timerCalculator(timer_registration, "NDT-OMP");
 
-                        /*----- [2] ICP Registration -----*/
-                        auto timer_icp = std::chrono::system_clock::now(); 
-                        //std::tie(cloud_ICP, ICP_transMatrix) = registration.ICP_Point2Point(cloud_NDT, cloud_now, NDT_transMatrix, 150, 1e-7, 0.6);
-                        std::tie(cloud_ICP, ICP_transMatrix) = registration.ICP_OMP(cloud_NDT, cloud_now, NDT_transMatrix);
-                        pcl::transformPointCloud (*cloud_now, *cloud_ICP_output, ICP_transMatrix.inverse() * NDT_transMatrix.inverse());
-                        timerCalculator(timer_icp, "ICP-OMP");
+                    /*----- [2] ICP Registration -----*/
+                    auto timer_icp = std::chrono::system_clock::now(); 
+                    //std::tie(cloud_ICP, ICP_transMatrix) = registration.ICP_Point2Point(cloud_NDT, cloud_now, NDT_transMatrix, 150, 1e-7, 0.6);
+                    std::tie(cloud_ICP, ICP_transMatrix) = registration.ICP_OMP(cloud_NDT, cloud_now, NDT_transMatrix);
+                    pcl::transformPointCloud (*cloud_now, *cloud_ICP_output, ICP_transMatrix.inverse() * NDT_transMatrix.inverse());
+                    timerCalculator(timer_icp, "ICP-OMP");
 
-                        /*-------- 3. Transfer aligned cloud into global coordinate --------*/
-                        pcl::transformPointCloud (*cloud_ICP_output, *cloud_global_trans, global_transMatrix);
-                        global_transMatrix = global_transMatrix * ICP_transMatrix.inverse() * NDT_transMatrix.inverse();
+                    /*-------- [3]. Transfer aligned cloud into global coordinate --------*/
+                    pcl::transformPointCloud (*cloud_ICP_output, *cloud_global_trans, global_transMatrix);
+                    global_transMatrix = global_transMatrix * ICP_transMatrix.inverse() * NDT_transMatrix.inverse();
 
-                        /*-------- 4. Stitch aligned clouds --------*/
-                        *cloud_final += *cloud_global_trans;
-                        *cloud_previous = *cloud_now;
+                    /*-------- [4]. Stitch aligned clouds --------*/
+                    *cloud_final += *cloud_global_trans;
+                    *cloud_previous = *cloud_now;
 
-                        auto registration_time = timerCalculator(timer_registration, "Registration"); // Print time
-                        if(registration_time > 0.2)
-                            overtime_count ++;
-                    }
+                    auto registration_time = timerCalculator(timer_registration, "Registration"); // Print time
+                    if(registration_time > 0.2)
+                        overtime_count ++;
     
                 }
 

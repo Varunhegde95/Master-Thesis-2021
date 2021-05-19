@@ -13,6 +13,6 @@ Use UKF to estimate vehicle state.
 
 Plot the filtered vehicle trajectory.
 
-## opendlv-pointcloud-preprocessing:
+## opendlv-pointcloud-processing:
 
-Use PCL to process the point cloud. The filtered pointcloud will be used for future registration.
+Use PCL to process the point cloud including downsampling, outlierfiltering, plane segmentation and registration.

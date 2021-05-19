@@ -676,6 +676,137 @@ public:
 };
 
 /*-------------------------------------------------------------------------------------*/
+template<typename PointT>
+class LidarOdometry{
+public:
+    // Constructor
+    LidarOdometry() = default;
+
+    // Destructor
+    ~LidarOdometry() = default;
+
+	void CalibrationInitialize(const Eigen::Matrix4f &gps2lidar,
+							   const ){
+		gps2lidar(0,0) = 9.999976e-01; 
+		gps2lidar(0,1) = 7.553071e-04;
+		gps2lidar(0,2) = -2.035826e-03;
+		gps2lidar(1,0) = -7.854027e-04;
+		gps2lidar(1,1) = 9.998898e-01;
+		gps2lidar(1,2) = -1.482298e-02;
+		gps2lidar(2,0) = 2.024406e-03;
+		gps2lidar(2,1) = 1.482454e-02;
+		gps2lidar(2,2) = 9.998881e-01;
+		gps2lidar(0,3) = -8.086759e-01;
+		gps2lidar(1,3) = 3.195559e-01;
+		gps2lidar(2,3) = -7.997231e-01; 
+
+		lidar2gps_trans(0,0) = 9.999976e-01; 
+		lidar2gps_trans(0,1) = 7.553071e-04;
+		lidar2gps_trans(0,2) = -2.035826e-03;
+		lidar2gps_trans(1,0) = -7.854027e-04;
+		lidar2gps_trans(1,1) = 9.998898e-01;
+		lidar2gps_trans(1,2) = -1.482298e-02;
+		lidar2gps_trans(2,0) = 2.024406e-03;
+		lidar2gps_trans(2,1) = 1.482454e-02;
+		lidar2gps_trans(2,2) = 9.998881e-01;
+		lidar2gps_trans(1,3) = 3.195559e-01;
+	}
+
+	/**
+	 * @brief Calculate quaternion with euler angles
+	 * 
+	 * @param rollAngle 
+	 * @param pitchAngle 
+	 * @param yawAngle 
+	 * @return Eigen::Matrix<float, 4, 1> 
+	 */
+	Eigen::Matrix<float, 4, 1> 
+ 	 Euler2Quaternion(const float &rollAngle, const float &pitchAngle, const float &yawAngle){
+		auto q1 = (float) cos(0.5 * rollAngle) * cos(0.5 * pitchAngle) * cos(0.5 * yawAngle) + (float) sin(0.5 * rollAngle) * sin(0.5 * pitchAngle) * sin(0.5 * yawAngle); 
+		auto q2 = (float) sin(0.5 * rollAngle) * cos(0.5 * pitchAngle) * cos(0.5 * yawAngle) - (float) cos(0.5 * rollAngle) * sin(0.5 * pitchAngle) * sin(0.5 * yawAngle); 
+		auto q3 = (float) cos(0.5 * rollAngle) * sin(0.5 * pitchAngle) * cos(0.5 * yawAngle) + (float) sin(0.5 * rollAngle) * cos(0.5 * pitchAngle) * sin(0.5 * yawAngle); 
+		auto q4 = (float) cos(0.5 * rollAngle) * cos(0.5 * pitchAngle) * sin(0.5 * yawAngle) - (float) sin(0.5 * rollAngle) * sin(0.5 * pitchAngle) * cos(0.5 * yawAngle); 
+		Eigen::Matrix<float, 4, 1> quaternion;
+		quaternion << q1, q2, q3, q4;
+		return quaternion;
+	}	
+
+	/**
+	 * @brief Calculate rotation matrix with quaternion
+	 * 
+	 * @param q Input quaternion
+	 * @return Eigen::Matrix<float, 3, 3> 
+	 */
+	Eigen::Matrix<float, 3, 3> 
+	 Quaternion2Rotation(const Eigen::Matrix4f &q){
+		auto q0(q(0, 0));
+		auto q1(q(1, 0));
+		auto q2(q(2, 0));
+		auto q3(q(3, 0));
+		Eigen::Matrix<float, 3, 3> R;
+		R << q0*q0 + q1*q1 - q2*q2 - q3*q3,  2*(q1*q2 - q0*q3),  2*(q0*q2 + q1*q3),
+			 2*(q1*q2 + q0*q3), q0*q0 - q1*q1 + q2*q2 - q3*q3, 2*(q2*q3 - q0*q1),
+			 2*(q1*q3 - q0*q2), 2*(q0*q1 + q2*q3),  q0*q0 - q1*q1 - q2*q2 + q3*q3;
+		return R;
+	}
+
+	/**
+	 * @brief Get the Transform Matrix object
+	 * 
+	 * @param R Input rotation matrix
+	 * @param delta_X Translation matrix X
+	 * @param delta_Y Translation matrix Y
+	 * @param delta_Z Translation matrix Z
+	 * @return Eigen::Matrix<float, 4, 4> 
+	 */
+	Eigen::Matrix<float, 4, 4> 
+     GetTransformMatrix(const Eigen::Matrix3f & R, 
+	 					const float &delta_X, 
+						const float &delta_Y, 
+						const float &delta_Z){
+		Eigen::Matrix<float, 4, 4> T(Eigen::Matrix4f::Zero(4, 4));
+		T << R(0,0), R(0,1), R(0,2), delta_X,
+			 R(1,0), R(1,1), R(1,2), delta_Y,
+			 R(2,0), R(2,1), R(2,2), delta_Z,
+			 0, 0, 0, 1;
+		return T;
+	}
+
+	/**
+	 * @brief convert transformation matrix to 6-Dof state transformation
+	 * 
+	 * @param R 
+	 * @return std::vector<float> 
+	 */
+	std::vector<float>
+	 Transformmatrix_to_states(const Eigen::Matrix4f &R) {
+	float epsilon = sqrt(R(0, 0) * R(0, 0) + R(1, 0) * R(1, 0));
+	bool singular = epsilon < 1e-6;
+	// Occurs if pitch is close to +/- 90 degrees
+	if (!singular) {
+		// states order x,y,z,pitch,roll,yaw
+		std::vector<float> states(6);
+		states[0] = R(0, 3);
+		states[1] = R(1, 3);
+		states[2] = R(2, 3);
+		states[3] = asinf(-R(2, 0));
+		states[4] = atan2(R(2, 1), R(2, 2));
+		states[5] = atan2(R(1, 0), R(0, 0));
+		return states;
+	} 
+	else { 
+		// states order x,y,z,pitch,roll,yaw
+		std::vector<float> states(6);
+		states[0] = R(0, 3);
+		states[1] = R(1, 3);
+		states[2] = R(2, 3);
+		states[3] = asinf(-R(2, 0));
+		states[4] = atan2(R(2, 1), R(2, 2));
+		states[5] = 0;
+		return states;
+	}
+};
+/*-------------------------------------------------------------------------------------*/
 
 template<typename PointT>
 class Visual{

@@ -126,15 +126,15 @@ int32_t main(int32_t argc, char **argv) {
                         << ", Yaw Rate: " << oxts_reading.wz << std::endl;
                     }
 
-                    // if(NUM%5 == 0){
-                    cluon::data::TimeStamp ts = cluon::time::now();
-                    sharedMemory->lock();
-                    sharedMemory->setTimeStamp(ts);
-                    memcpy(sharedMemory->data(), static_cast<void const*>(cloud_valid.get()), sharedMemory->size());
-                    sharedMemory->unlock();
-                    sharedMemory->notifyAll();
-                    std::cout << "Save PCD [" << NUM << "] to shared memory: " << cloud_valid->points.size() << ", points" << ", data size: " << sharedMemory->size() << " bytes." << std::endl;
-                    // }
+                    if(NUM%3 == 0){
+                        cluon::data::TimeStamp ts = cluon::time::now();
+                        sharedMemory->lock();
+                        sharedMemory->setTimeStamp(ts);
+                        memcpy(sharedMemory->data(), static_cast<void const*>(cloud_valid.get()), sharedMemory->size());
+                        sharedMemory->unlock();
+                        sharedMemory->notifyAll();
+                        std::cout << "Save PCD [" << NUM << "] to shared memory: " << cloud_valid->points.size() << ", points" << ", data size: " << sharedMemory->size() << " bytes." << std::endl;
+                    }
                 }
                 NUM ++;
             }};
