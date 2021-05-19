@@ -116,9 +116,9 @@ int32_t main(int32_t argc, char **argv) {
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_other(new pcl::PointCloud<pcl::PointXYZ>());
                 auto plane_timer = std::chrono::system_clock::now();
                 // std::tie(cloud_road, cloud_other) = segmentation.PlaneSegmentationRANSAC(cloud_down, RoughGroundPoints, 150, 0.2);
-                std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.3f); // SVD method
+                std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.35f); // SVD method (faster than RANSAC)
                 timerCalculator(plane_timer, "Plane segmentation");
-                
+
                 /*------ 5. Registration ------*/
                 if(NUM == 0){
                     std::cout << "Frame [" << NUM << "]: Set up <cloud_previous>." << std::endl;
@@ -126,29 +126,35 @@ int32_t main(int32_t argc, char **argv) {
                     *cloud_final += *cloud_previous;
                 }
                 else{
-                     std::cout << "Registration start ..." << std::endl;
-                    *cloud_now = *cloud_other;   
+                    if(NUM%5 == 0){
+                        std::cout << "Registration start ..." << std::endl;
+                        *cloud_now = *cloud_other;   
 
-                    /*----- [1] NDT Registration -----*/
-                    //std::cout << "NDT Registration" << std::endl;
-                    auto timer_registration = std::chrono::system_clock::now(); // Start NDT timer
-                    std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_Registration(cloud_previous, cloud_now, initial_guess_transMatrix, 1e-2, 0.2, 2.0, 10);
-                    
-                    /*----- [2] ICP Registration -----*/
-                    std::tie(cloud_ICP, ICP_transMatrix) = registration.ICP_Point2Point(cloud_NDT, cloud_now, NDT_transMatrix, 100, 1e-6, 0.6);
-                    pcl::transformPointCloud (*cloud_now, *cloud_ICP_output, ICP_transMatrix.inverse() * NDT_transMatrix.inverse());
+                        /*----- [1] NDT Registration -----*/
+                        auto timer_registration = std::chrono::system_clock::now(); // Start NDT timer
+                        std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_OMP(cloud_previous, cloud_now, initial_guess_transMatrix, 2.0);
+                        timerCalculator(timer_registration, "NDT-OMP");
 
-                    /*-------- 3. Transfer aligned cloud into global coordinate --------*/
-                    pcl::transformPointCloud (*cloud_ICP_output, *cloud_global_trans, global_transMatrix);
-                    global_transMatrix = global_transMatrix * ICP_transMatrix.inverse() * NDT_transMatrix.inverse();
+                        /*----- [2] ICP Registration -----*/
+                        auto timer_icp = std::chrono::system_clock::now(); 
+                        //std::tie(cloud_ICP, ICP_transMatrix) = registration.ICP_Point2Point(cloud_NDT, cloud_now, NDT_transMatrix, 150, 1e-7, 0.6);
+                        std::tie(cloud_ICP, ICP_transMatrix) = registration.ICP_OMP(cloud_NDT, cloud_now, NDT_transMatrix);
+                        pcl::transformPointCloud (*cloud_now, *cloud_ICP_output, ICP_transMatrix.inverse() * NDT_transMatrix.inverse());
+                        timerCalculator(timer_icp, "ICP-OMP");
 
-                    /*-------- 4. Stitch aligned clouds --------*/
-                    *cloud_final += *cloud_global_trans;
-                    *cloud_previous = *cloud_now;
+                        /*-------- 3. Transfer aligned cloud into global coordinate --------*/
+                        pcl::transformPointCloud (*cloud_ICP_output, *cloud_global_trans, global_transMatrix);
+                        global_transMatrix = global_transMatrix * ICP_transMatrix.inverse() * NDT_transMatrix.inverse();
 
-                    auto registration_time = timerCalculator(timer_registration, "Registration"); // Print time
-                    if(registration_time > 0.2)
-                        overtime_count ++;
+                        /*-------- 4. Stitch aligned clouds --------*/
+                        *cloud_final += *cloud_global_trans;
+                        *cloud_previous = *cloud_now;
+
+                        auto registration_time = timerCalculator(timer_registration, "Registration"); // Print time
+                        if(registration_time > 0.2)
+                            overtime_count ++;
+                    }
+    
                 }
 
                 /*------ 6. Visualization ------*/

@@ -53,6 +53,11 @@
 // Visualization
 #include <pcl/visualization/pcl_visualizer.h>
 
+
+// NDT-omp
+#include <pclomp/ndt_omp.h>
+#include <pclomp/gicp_omp.h>
+
 #define RED    Color(0.6, 0, 0)
 #define GREEN  Color(0.235, 0.702, 0.443)
 #define BLUE   Color(0.4, 0.698, 1)
@@ -540,7 +545,7 @@ public:
     ~Registration() = default;
 
 	/**
-	 * @brief 
+	 * @brief PCL NDT registration
 	 * 
 	 * @param cloud_source 
 	 * @param cloud_target 
@@ -553,14 +558,14 @@ public:
 	 */
 	std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f> 
 	 NDT_Registration(const typename pcl::PointCloud<PointT>::Ptr &cloud_source,
-											const typename pcl::PointCloud<PointT>::Ptr &cloud_target, 
-											const Eigen::Matrix4f &init_guess,
-											const float &tTransformationEpsilon,
-											const float &StepSize,
-											const float &Resolution,
-											const int &MaxIteration){
+					  const typename pcl::PointCloud<PointT>::Ptr &cloud_target, 
+					  const Eigen::Matrix4f &init_guess,
+					  const float &tTransformationEpsilon,
+					  const float &StepSize,
+					  const float &Resolution,
+					  const int &MaxIteration){
 		typename pcl::PointCloud<PointT>::Ptr output(new pcl::PointCloud<PointT>);
-		pcl::NormalDistributionsTransform<PointT, PointT> NDT;
+		typename pcl::NormalDistributionsTransform<PointT, PointT> NDT;
 		NDT.setTransformationEpsilon(tTransformationEpsilon);
 		NDT.setStepSize(StepSize);           
 		NDT.setResolution(Resolution);        
@@ -580,6 +585,40 @@ public:
 	}
 	
 	/**
+	 * @brief Multi thread NDR registration using OpenMP
+	 * 
+	 * @param cloud_source 
+	 * @param cloud_target 
+	 * @param resolution 
+	 * @return std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f> 
+	 */
+	std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f>
+	 NDT_OMP(const typename pcl::PointCloud<PointT>::Ptr &cloud_source,
+	 		 const typename pcl::PointCloud<PointT>::Ptr &cloud_target, 
+			 const Eigen::Matrix4f &init_guess,
+			 //const float &tTransformationEpsilon,
+			 const float &resolution = 1.0){
+		typename pcl::PointCloud<PointT>::Ptr output(new pcl::PointCloud<PointT>);
+		typename pclomp::NormalDistributionsTransform<PointT, PointT> ndt_omp;
+		ndt_omp.setNumThreads(omp_get_max_threads());
+		//ndt_omp.setTransformationEpsilon(tTransformationEpsilon);
+		ndt_omp.setResolution(resolution);
+		ndt_omp.setNeighborhoodSearchMethod(pclomp::DIRECT7);
+		ndt_omp.setInputSource(cloud_source); 
+		ndt_omp.setInputTarget(cloud_target); 
+		ndt_omp.align(*output, init_guess);
+		Eigen::Matrix4f SourceToTarget(Eigen::Matrix4f::Identity());
+		if(ndt_omp.hasConverged()){
+			std::cout << "NDP-OMP has converged, score is " << ndt_omp.getFitnessScore () << std::endl;
+			std::cout << "Transformation matrix:" << std::endl;
+			SourceToTarget = ndt_omp.getFinalTransformation();
+			std::cout << SourceToTarget << std::endl;
+			pcl::transformPointCloud(*cloud_source, *output, SourceToTarget);
+		}
+		return std::make_tuple(output, SourceToTarget);
+	}
+
+	/**
 	 * @brief ICP point to point registration
 	 * 
 	 * @param cloud_source 
@@ -597,23 +636,43 @@ public:
                       const int &MaxIteration,
                       const float &Epsilon,
                       const float &MaxCorrespondenceDistance){
-    typename pcl::PointCloud<PointT>::Ptr output(new pcl::PointCloud<PointT>);
-    typename pcl::IterativeClosestPoint<PointT, PointT> icp;
-    icp.setMaximumIterations(MaxIteration);
-    icp.setEuclideanFitnessEpsilon(Epsilon);  // Convergence condition: The smaller the accuracy, the slower the convergence
-	icp.setMaxCorrespondenceDistance(MaxCorrespondenceDistance);
-    icp.setInputSource(cloud_source);      
-    icp.setInputTarget(cloud_target); 
-    icp.align(*output, init_transform);  
-    Eigen::Matrix4f SourceToTarget (Eigen::Matrix4f::Identity());
-    if (icp.hasConverged()){
-        std::cout << "\nICP has converged, score is " << icp.getFitnessScore () << std::endl;
-        std::cout << "Transformation matrix:" << std::endl;
-        SourceToTarget = icp.getFinalTransformation();
-        std::cout << SourceToTarget << std::endl;
-    }
-    return std::make_tuple(output, SourceToTarget);
-}
+		typename pcl::PointCloud<PointT>::Ptr output(new pcl::PointCloud<PointT>);
+		typename pcl::IterativeClosestPoint<PointT, PointT> icp;
+		icp.setMaximumIterations(MaxIteration);
+		icp.setEuclideanFitnessEpsilon(Epsilon);  // Convergence condition: The smaller the accuracy, the slower the convergence
+		icp.setMaxCorrespondenceDistance(MaxCorrespondenceDistance);
+		icp.setInputSource(cloud_source);      
+		icp.setInputTarget(cloud_target); 
+		icp.align(*output, init_transform);  
+		Eigen::Matrix4f SourceToTarget (Eigen::Matrix4f::Identity());
+		if (icp.hasConverged()){
+			std::cout << "\nICP has converged, score is " << icp.getFitnessScore () << std::endl;
+			std::cout << "Transformation matrix:" << std::endl;
+			SourceToTarget = icp.getFinalTransformation();
+			std::cout << SourceToTarget << std::endl;
+		}
+		return std::make_tuple(output, SourceToTarget);
+	}
+
+	std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f> 
+	 ICP_OMP(const typename pcl::PointCloud<PointT>::Ptr &cloud_source,
+             const typename pcl::PointCloud<PointT>::Ptr &cloud_target, 
+             const Eigen::Matrix4f &init_transform){
+		typename pcl::PointCloud<PointT>::Ptr output(new pcl::PointCloud<PointT>);
+		typename pclomp::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> gicp_omp;
+		gicp_omp.setInputSource(cloud_source);      
+		gicp_omp.setInputTarget(cloud_target); 
+		gicp_omp.align(*output, init_transform);  
+		Eigen::Matrix4f SourceToTarget (Eigen::Matrix4f::Identity());
+		if (gicp_omp.hasConverged()){
+			std::cout << "ICP-OMP has converged, score is " << gicp_omp.getFitnessScore () << std::endl;
+			std::cout << "Transformation matrix:" << std::endl;
+			SourceToTarget = gicp_omp.getFinalTransformation();
+			std::cout << SourceToTarget << std::endl;
+		}
+		return std::make_tuple(output, SourceToTarget);
+	}
+
 };
 
 /*-------------------------------------------------------------------------------------*/

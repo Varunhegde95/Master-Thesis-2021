@@ -67,6 +67,12 @@ include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions( ${PCL_DEFINITIONS} )
 
+# Find and include OpenMP
+find_package(OpenMP)
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+include_directories(src/pclomp/include/pclomp)
+add_library(ndt_omp src/pclomp/voxel_grid_covariance_omp.cpp src/pclomp/ndt_omp.cpp src/pclomp/gicp_omp.cpp)
+
 # If on Linux, find and include LibRT
 if(UNIX)
     if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
@@ -83,7 +89,8 @@ add_executable(${PROJECT_NAME}
   ${CMAKE_BINARY_DIR}/opendlv-standard-message-set.hpp
   ${CMAKE_BINARY_DIR}/cluon-complete.hpp
 )
-target_link_libraries(${PROJECT_NAME} ${LIBRARIES} ${PCL_LIBRARIES})
+add_dependencies(${PROJECT_NAME} ndt_omp)
+target_link_libraries(${PROJECT_NAME} ${LIBRARIES} ${PCL_LIBRARIES} ${OpenMP_LIBS} ndt_omp)
 
 ################################################################################
 # Install executable.

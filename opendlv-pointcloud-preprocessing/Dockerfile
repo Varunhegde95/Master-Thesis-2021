@@ -30,7 +30,8 @@ RUN apt-get update -y && \
     libflann-dev \
     libvtk6-qt-dev \
     libboost-all-dev \
-    libpcl-dev
+    libpcl-dev \
+    libomp-dev
 
 RUN add-apt-repository -y ppa:chrberger/libcluon
 RUN apt-get update
@@ -53,7 +54,8 @@ RUN apt-get update -y && \
     libflann-dev \
     libvtk6-qt-dev \
     libboost-all-dev \
-    libpcl-dev 
+    libpcl-dev \
+    libomp-dev
     
 WORKDIR /usr/bin
 COPY --from=builder /tmp/dest /usr
