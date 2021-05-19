@@ -1,16 +1,16 @@
-#ifndef PREPROCESSING_HPP
-#define PREPROCESSING_HPP
-/* \author Leo Wang & Varun Hegde*/
-// Customized Supporting function for pointcloud preprocessing 
-// using PCL
-
+#ifndef PROCESSING_HPP
+#define PROCESSING_HPP
 /**
- * Developer: Liangyu Wang
+ * @brief Customized Supporting function for pointcloud processing using PCL
+ * 
+ *
+ * Developer: Liangyu Wang & Varun Hegde
  * E-mail:    liangyu@student.chalmers.se
+ * 			  varunh@student.chalmers.se
  * Date:      03/2020
- */
+**/
+
 #include <iostream>
-//#include <fstream>
 #include <memory>
 #include <thread>
 #include <random>
@@ -685,32 +685,32 @@ public:
     // Destructor
     ~LidarOdometry() = default;
 
-	void CalibrationInitialize(const Eigen::Matrix4f &gps2lidar,
-							   const ){
-		gps2lidar(0,0) = 9.999976e-01; 
-		gps2lidar(0,1) = 7.553071e-04;
-		gps2lidar(0,2) = -2.035826e-03;
-		gps2lidar(1,0) = -7.854027e-04;
-		gps2lidar(1,1) = 9.998898e-01;
-		gps2lidar(1,2) = -1.482298e-02;
-		gps2lidar(2,0) = 2.024406e-03;
-		gps2lidar(2,1) = 1.482454e-02;
-		gps2lidar(2,2) = 9.998881e-01;
-		gps2lidar(0,3) = -8.086759e-01;
-		gps2lidar(1,3) = 3.195559e-01;
-		gps2lidar(2,3) = -7.997231e-01; 
+	// void CalibrationInitialize(const Eigen::Matrix4f &gps2lidar,
+	// 						   const ){
+	// 	gps2lidar(0,0) = 9.999976e-01; 
+	// 	gps2lidar(0,1) = 7.553071e-04;
+	// 	gps2lidar(0,2) = -2.035826e-03;
+	// 	gps2lidar(1,0) = -7.854027e-04;
+	// 	gps2lidar(1,1) = 9.998898e-01;
+	// 	gps2lidar(1,2) = -1.482298e-02;
+	// 	gps2lidar(2,0) = 2.024406e-03;
+	// 	gps2lidar(2,1) = 1.482454e-02;
+	// 	gps2lidar(2,2) = 9.998881e-01;
+	// 	gps2lidar(0,3) = -8.086759e-01;
+	// 	gps2lidar(1,3) = 3.195559e-01;
+	// 	gps2lidar(2,3) = -7.997231e-01; 
 
-		lidar2gps_trans(0,0) = 9.999976e-01; 
-		lidar2gps_trans(0,1) = 7.553071e-04;
-		lidar2gps_trans(0,2) = -2.035826e-03;
-		lidar2gps_trans(1,0) = -7.854027e-04;
-		lidar2gps_trans(1,1) = 9.998898e-01;
-		lidar2gps_trans(1,2) = -1.482298e-02;
-		lidar2gps_trans(2,0) = 2.024406e-03;
-		lidar2gps_trans(2,1) = 1.482454e-02;
-		lidar2gps_trans(2,2) = 9.998881e-01;
-		lidar2gps_trans(1,3) = 3.195559e-01;
-	}
+	// 	lidar2gps_trans(0,0) = 9.999976e-01; 
+	// 	lidar2gps_trans(0,1) = 7.553071e-04;
+	// 	lidar2gps_trans(0,2) = -2.035826e-03;
+	// 	lidar2gps_trans(1,0) = -7.854027e-04;
+	// 	lidar2gps_trans(1,1) = 9.998898e-01;
+	// 	lidar2gps_trans(1,2) = -1.482298e-02;
+	// 	lidar2gps_trans(2,0) = 2.024406e-03;
+	// 	lidar2gps_trans(2,1) = 1.482454e-02;
+	// 	lidar2gps_trans(2,2) = 9.998881e-01;
+	// 	lidar2gps_trans(1,3) = 3.195559e-01;
+	// }
 
 	/**
 	 * @brief Calculate quaternion with euler angles
@@ -775,35 +775,36 @@ public:
 	/**
 	 * @brief convert transformation matrix to 6-Dof state transformation
 	 * 
-	 * @param R 
+	 * @param R Rotation of the transformation matrix
 	 * @return std::vector<float> 
 	 */
 	std::vector<float>
 	 Transformmatrix_to_states(const Eigen::Matrix4f &R) {
-	float epsilon = sqrt(R(0, 0) * R(0, 0) + R(1, 0) * R(1, 0));
-	bool singular = epsilon < 1e-6;
-	// Occurs if pitch is close to +/- 90 degrees
-	if (!singular) {
-		// states order x,y,z,pitch,roll,yaw
-		std::vector<float> states(6);
-		states[0] = R(0, 3);
-		states[1] = R(1, 3);
-		states[2] = R(2, 3);
-		states[3] = asinf(-R(2, 0));
-		states[4] = atan2(R(2, 1), R(2, 2));
-		states[5] = atan2(R(1, 0), R(0, 0));
-		return states;
-	} 
-	else { 
-		// states order x,y,z,pitch,roll,yaw
-		std::vector<float> states(6);
-		states[0] = R(0, 3);
-		states[1] = R(1, 3);
-		states[2] = R(2, 3);
-		states[3] = asinf(-R(2, 0));
-		states[4] = atan2(R(2, 1), R(2, 2));
-		states[5] = 0;
-		return states;
+		float epsilon = sqrt(R(0, 0) * R(0, 0) + R(1, 0) * R(1, 0));
+		bool singular = epsilon < 1e-6;
+		// Occurs if pitch is close to +/- 90 degrees
+		if (!singular) {
+			// states order x,y,z,pitch,roll,yaw
+			std::vector<float> states(6);
+			states[0] = R(0, 3);
+			states[1] = R(1, 3);
+			states[2] = R(2, 3);
+			states[3] = asinf(-R(2, 0));
+			states[4] = atan2(R(2, 1), R(2, 2));
+			states[5] = atan2(R(1, 0), R(0, 0));
+			return states;
+		} 
+		else { 
+			// states order x,y,z,pitch,roll,yaw
+			std::vector<float> states(6);
+			states[0] = R(0, 3);
+			states[1] = R(1, 3);
+			states[2] = R(2, 3);
+			states[3] = asinf(-R(2, 0));
+			states[4] = atan2(R(2, 1), R(2, 2));
+			states[5] = 0;
+			return states;
+		}
 	}
 };
 /*-------------------------------------------------------------------------------------*/
@@ -878,4 +879,4 @@ public:
     viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, color.R, color.G, color.B, name);
 	}
 };
-#endif /*PREPROCESSING_HPP*/
+#endif /*PROCESSING_HPP*/

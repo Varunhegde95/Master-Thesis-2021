@@ -13,7 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Part to build opendlv-pointcloud-preprocessing.
+# Part to build opendlv-pointcloud-processing.
+
 FROM nvidia/opengl:1.0-glvnd-devel-ubuntu18.04 as builder
 ENV DEBIAN_FRONTEND=noninteractive
 MAINTAINER Liangyu Wang "liangyu@student.chalmers.se"
@@ -59,4 +60,4 @@ RUN apt-get update -y && \
     
 WORKDIR /usr/bin
 COPY --from=builder /tmp/dest /usr
-ENTRYPOINT ["/usr/bin/opendlv-pointcloud-preprocessing"]
+ENTRYPOINT ["/usr/bin/opendlv-pointcloud-processing"]
