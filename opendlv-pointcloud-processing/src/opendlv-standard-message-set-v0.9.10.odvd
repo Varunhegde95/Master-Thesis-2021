@@ -390,3 +390,9 @@ message opendlv.fused.Movement [id = 9052] {
   float vy [id = 5];
   float vz [id = 6];
 }
+
+message opendlv.lidarodom.Position [id = 9054] {
+  float x [id = 1];
+  float y [id = 2];
+  float z [id = 3];
+}

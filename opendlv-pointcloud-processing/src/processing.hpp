@@ -679,38 +679,38 @@ public:
 template<typename PointT>
 class LidarOdometry{
 public:
+	Eigen::Matrix4f GPS_IMU_to_lidar;  
+	Eigen::Matrix4f lidar_to_GPS_IMU;
+	Eigen::Matrix<float, 4, 1> Lidar_trans;
+
     // Constructor
     LidarOdometry() = default;
 
     // Destructor
     ~LidarOdometry() = default;
 
-	// void CalibrationInitialize(const Eigen::Matrix4f &gps2lidar,
-	// 						   const ){
-	// 	gps2lidar(0,0) = 9.999976e-01; 
-	// 	gps2lidar(0,1) = 7.553071e-04;
-	// 	gps2lidar(0,2) = -2.035826e-03;
-	// 	gps2lidar(1,0) = -7.854027e-04;
-	// 	gps2lidar(1,1) = 9.998898e-01;
-	// 	gps2lidar(1,2) = -1.482298e-02;
-	// 	gps2lidar(2,0) = 2.024406e-03;
-	// 	gps2lidar(2,1) = 1.482454e-02;
-	// 	gps2lidar(2,2) = 9.998881e-01;
-	// 	gps2lidar(0,3) = -8.086759e-01;
-	// 	gps2lidar(1,3) = 3.195559e-01;
-	// 	gps2lidar(2,3) = -7.997231e-01; 
+	void CalibrationInitialize( ){
+		Lidar_trans(0,0) = 0;
+    	Lidar_trans(1,0) = 0;
+    	Lidar_trans(2,0) = 0;
+    	Lidar_trans(3,0) = 1;
 
-	// 	lidar2gps_trans(0,0) = 9.999976e-01; 
-	// 	lidar2gps_trans(0,1) = 7.553071e-04;
-	// 	lidar2gps_trans(0,2) = -2.035826e-03;
-	// 	lidar2gps_trans(1,0) = -7.854027e-04;
-	// 	lidar2gps_trans(1,1) = 9.998898e-01;
-	// 	lidar2gps_trans(1,2) = -1.482298e-02;
-	// 	lidar2gps_trans(2,0) = 2.024406e-03;
-	// 	lidar2gps_trans(2,1) = 1.482454e-02;
-	// 	lidar2gps_trans(2,2) = 9.998881e-01;
-	// 	lidar2gps_trans(1,3) = 3.195559e-01;
-	// }
+		GPS_IMU_to_lidar = Eigen::Matrix4f::Identity();
+		
+		GPS_IMU_to_lidar(0,0)= 9.999976e-01; 
+		GPS_IMU_to_lidar(0,1)= 7.553071e-04;
+		GPS_IMU_to_lidar(0,2)= -2.035826e-03;
+		GPS_IMU_to_lidar(1,0)= -7.854027e-04;
+		GPS_IMU_to_lidar(1,1)= 9.998898e-01;
+		GPS_IMU_to_lidar(1,2)= -1.482298e-02;
+		GPS_IMU_to_lidar(2,0)= 2.024406e-03;
+		GPS_IMU_to_lidar(2,1)= 1.482454e-02;
+		GPS_IMU_to_lidar(2,2)= 9.998881e-01;
+		GPS_IMU_to_lidar(0,3)= -8.086759e-01;
+		GPS_IMU_to_lidar(1,3)= 3.195559e-01;
+		GPS_IMU_to_lidar(2,3)= -7.997231e-01; 
+		lidar_to_GPS_IMU = GPS_IMU_to_lidar.inverse();
+	}
 
 	/**
 	 * @brief Calculate quaternion with euler angles

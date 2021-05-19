@@ -38,11 +38,14 @@ int32_t main(int32_t argc, char **argv) {
         float const FREQ{std::stof(commandlineArguments["freq"])}; // Frequency
         const bool DISPLAY{commandlineArguments.count("display") != 0};
         const bool VERBOSE{commandlineArguments.count("verbose") != 0};
+        uint32_t const SENDER_ID{(commandlineArguments["id-sender"].size() != 0)               
+            ? static_cast<uint32_t>(std::stoi(commandlineArguments["id-sender"])) : 0};
 
         Filters<pcl::PointXYZ> filter;
         Segmentation<pcl::PointXYZ> segmentation;
         Visual<pcl::PointXYZ> visual;
         Registration<pcl::PointXYZ> registration;
+        LidarOdometry<pcl::PointXYZ> lidarodom;
 
         pcl::visualization::PCLVisualizer viewer("PCD Preprocessing"); // Initialize PCD viewer
         CameraAngle camera_angle = TOP; // Set viewercamera angle
@@ -62,12 +65,6 @@ int32_t main(int32_t argc, char **argv) {
         Eigen::Matrix4f ICP_transMatrix (Eigen::Matrix4f::Identity());
         Eigen::Matrix4f global_transMatrix (Eigen::Matrix4f::Identity());
 
-        Eigen::Matrix4f global_transMatrix_lidar (Eigen::Matrix4f::Identity());            // Transform the lidar on the gps trajectory
-        Eigen::Matrix4f Global_GPS_trans_init (Eigen::Matrix4f::Identity());
-        Eigen::Matrix4f GPS_IMU_to_Velodyne_kitti (Eigen::Matrix4f::Identity());           // Calibration transform the lidar to IMU/GPS
-        Eigen::Matrix4f GPS_IMU_to_Velodyne_kitti_gt_trans (Eigen::Matrix4f::Identity());  // Calibration transform the lidar to IMU/GPS (rotaion and y direction only)
-        Eigen::Matrix4f GPS_IMU_to_Velodyne_kitti_inv (Eigen::Matrix4f::Identity());       // Calibration transform the  IMU/GPS to lidar 
-
         //Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
         
@@ -81,6 +78,7 @@ int32_t main(int32_t argc, char **argv) {
         
             int16_t NUM = 0;
             int16_t overtime_count = 0; // Count the times of over-time 
+            lidarodom.CalibrationInitialize();
             pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPCL(new pcl::PointCloud<pcl::PointXYZ>);
             cloudPCL->resize(shmRead->size()/16);
 
@@ -130,6 +128,8 @@ int32_t main(int32_t argc, char **argv) {
                     std::cout << "Frame [" << NUM << "]: Set up <cloud_previous>." << std::endl;
                     *cloud_previous = *cloud_other;
                     *cloud_final += *cloud_previous;
+                    global_transMatrix = lidarodom.lidar_to_GPS_IMU* global_transMatrix;
+                    std::cout << "Global trans matrix: " << global_transMatrix << std::endl;
                 }
                 else{
                     std::cout << "Registration start ..." << std::endl;
@@ -142,7 +142,6 @@ int32_t main(int32_t argc, char **argv) {
 
                     /*----- [2] ICP Registration -----*/
                     auto timer_icp = std::chrono::system_clock::now(); 
-                    //std::tie(cloud_ICP, ICP_transMatrix) = registration.ICP_Point2Point(cloud_NDT, cloud_now, NDT_transMatrix, 150, 1e-7, 0.6);
                     std::tie(cloud_ICP, ICP_transMatrix) = registration.ICP_OMP(cloud_NDT, cloud_now, NDT_transMatrix);
                     pcl::transformPointCloud (*cloud_now, *cloud_ICP_output, ICP_transMatrix.inverse() * NDT_transMatrix.inverse());
                     timerCalculator(timer_icp, "ICP-OMP");
@@ -155,10 +154,23 @@ int32_t main(int32_t argc, char **argv) {
                     *cloud_final += *cloud_global_trans;
                     *cloud_previous = *cloud_now;
 
+                    // states order x,y,z,pitch,roll,yaw
+                    std::vector<float> States_from_trans = lidarodom.Transformmatrix_to_states(global_transMatrix);
+                    lidarodom.Lidar_trans(0,0) = States_from_trans[0];
+                    lidarodom.Lidar_trans(1,0) = States_from_trans[1];
+
                     auto registration_time = timerCalculator(timer_registration, "Registration"); // Print time
-                    if(registration_time > 0.2)
+                    if(registration_time > 0.333)
                         overtime_count ++;
-    
+                }
+
+                //Sending message to opendlv::lidarodom::Position
+                cluon::data::TimeStamp ts{cluon::time::now()};
+                {
+                    opendlv::lidarodom::Position position;
+                    position.x(static_cast<float>  (lidarodom.Lidar_trans(0,0)));  // Position X
+                    position.y(static_cast<float>  (lidarodom.Lidar_trans(1,0)));  // Position Y
+                    od4.send(position, ts, SENDER_ID);
                 }
 
                 /*------ 6. Visualization ------*/

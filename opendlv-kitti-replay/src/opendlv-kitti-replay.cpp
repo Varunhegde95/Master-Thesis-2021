@@ -126,7 +126,7 @@ int32_t main(int32_t argc, char **argv) {
                         << ", Yaw Rate: " << oxts_reading.wz << std::endl;
                     }
 
-                    if(NUM%3 == 0){
+                    if(NUM%4 == 0){
                         cluon::data::TimeStamp ts = cluon::time::now();
                         sharedMemory->lock();
                         sharedMemory->setTimeStamp(ts);

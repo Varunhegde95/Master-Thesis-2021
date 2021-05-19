@@ -39,10 +39,11 @@ int32_t main(int32_t argc, char **argv) {
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
 
         // Handler to receive data from sim-sensors (realized as C++ lambda).
-        std::mutex UKFReadingMutex;     // EKF Reading Mutex
+        std::mutex UKFReadingMutex; // EKF Reading Mutex
         std::mutex RawReadingMutex; // Raw GPS measure position
+        std::mutex LidarReadingMutex; // Lidar odometry position
 
-        std::vector<double> filteredX, filteredY, rawX, rawY; // Initialize Plotting Vector
+        std::vector<double> filteredX, filteredY, rawX, rawY, lidarX, lidarY; // Initialize Plotting Vector
 
         auto onUKFReading{[&UKFReadingMutex, &filteredX, &filteredY](cluon::data::Envelope &&envelope) {
             auto msg = cluon::extractMessage<opendlv::fused::Movement>(std::move(envelope));
@@ -62,18 +63,29 @@ int32_t main(int32_t argc, char **argv) {
             rawY.push_back(y);
         }};
 
+        auto onLidarReading{[&LidarReadingMutex, &lidarX, &lidarY](cluon::data::Envelope &&envelope){
+            auto msg = cluon::extractMessage<opendlv::lidarodom::Position>(std::move(envelope));
+            std::lock_guard<std::mutex> lck(LidarReadingMutex);
+            auto x = msg.x();  // Raw Position X
+            auto y = msg.y();  // Raw Position Y
+            lidarX.push_back(x);
+            lidarY.push_back(y);
+        }};
+
         // Register our lambda for the message identifier
         od4.dataTrigger(opendlv::fused::Movement::ID(), onUKFReading);
         od4.dataTrigger(opendlv::sensor::Position::ID(), onRawReading);
+        od4.dataTrigger(opendlv::lidarodom::Position::ID(), onLidarReading);
 
         uint64_t frameCount{0};
-        auto atFrequency{[&od4, &filteredX, &filteredY, &rawX, &rawY, &DISPLAY, &VERBOSE, &frameCount]() -> bool
+        auto atFrequency{[&od4, &filteredX, &filteredY, &rawX, &rawY, &lidarX, &lidarY, &DISPLAY, &VERBOSE, &frameCount]() -> bool
         {
             /*------ Visualization ------*/
             if(DISPLAY){
                 matplotlibcpp::clf(); // Clear [matplotlib] previous plot
                 matplotlibcpp::scatter(rawX, rawY, 8);
                 matplotlibcpp::named_plot("Filtered", filteredX, filteredY, "r-"); // Filtered positions
+                matplotlibcpp::named_plot("Lidar Odom", lidarX, lidarY, "g-"); // Filtered positions
                 matplotlibcpp::title("UKF Result");
                 matplotlibcpp::legend(); // Enable legend
                 matplotlibcpp::grid(true); // Enable Grid
