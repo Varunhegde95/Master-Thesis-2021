@@ -1,6 +1,14 @@
 #ifndef KITTI_REPLAY_HPP
 #define KITTI_REPLAY_HPP
-
+/**
+ * @brief Customized functions for replying KITTI dataset
+ * 
+ *
+ * Developer: Liangyu Wang & Varun Hegde
+ * E-mail:    liangyu@student.chalmers.se
+ * 			  varunh@student.chalmers.se
+ * Date:      03/2021
+**/
 #include <iostream>
 #include <fstream>
 #include <thread>

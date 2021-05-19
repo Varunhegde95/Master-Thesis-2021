@@ -1,14 +1,14 @@
 #ifndef UKF_HPP
 #define UKF_HPP
-/* \author Leo Wang & Varun Hegde*/
-// Customized functions for Unscented Kalman Filter
-// using Eigen 3
-
 /**
- * Developer: Liangyu Wang
+ * @brief Customized UKF function using Eigen 3
+ * 
+ *
+ * Developer: Liangyu Wang & Varun Hegde
  * E-mail:    liangyu@student.chalmers.se
- * Date:      03/2020
- */
+ * 			  varunh@student.chalmers.se
+ * Date:      03/2021
+**/
 
 #include <thread>
 

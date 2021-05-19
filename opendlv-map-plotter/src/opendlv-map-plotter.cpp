@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021  Liangyu Wang
+ * Copyright (C) 2021  Liangyu Wang & Varun Hegde
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +17,6 @@
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
 #include "matplotlibcpp.h"
-
 
 int32_t main(int32_t argc, char **argv) {
     int32_t retCode{1};
