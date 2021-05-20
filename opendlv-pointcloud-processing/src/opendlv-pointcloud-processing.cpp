@@ -67,7 +67,25 @@ int32_t main(int32_t argc, char **argv) {
 
         //Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
+        // Handler to receive data from sim-sensors (realized as C++ lambda).
         
+        std::mutex UKFReadingMutex; // EKF Reading Mutex
+        float pitch(0.0);
+        float roll(0.0);
+        float yaw(0.0);
+
+        auto onUKFReading{[&UKFReadingMutex, &pitch, &roll, &yaw](cluon::data::Envelope &&envelope) {
+            auto msg = cluon::extractMessage<opendlv::fused::Movement>(std::move(envelope));
+            std::lock_guard<std::mutex> lck(UKFReadingMutex);
+            pitch = msg.pitch();  // Pitch
+            roll  = msg.roll();   // Roll
+            yaw   = msg.yaw();    // Yaw
+            std::cout << "-----YAW: " << yaw << std::endl;
+        }};
+
+        // Register our lambda for the message identifier
+        od4.dataTrigger(opendlv::fused::Movement::ID(), onUKFReading);
+
         std::cout << "Connecting to shared memory " << NAME_READ << std::endl;
         std::unique_ptr<cluon::SharedMemory> shmRead{new cluon::SharedMemory{NAME_READ}};
 
@@ -102,13 +120,13 @@ int32_t main(int32_t argc, char **argv) {
                 const Eigen::Vector4f max_point(40, 25, 4, 1);
                 cloud_down = filter.boxFilter(cloud_down, min_point, max_point); //Distance Crop Box
 
-                const Eigen::Vector4f roof_min(-1.5, -1.8, -1, 1);
-                const Eigen::Vector4f roof_max(2.6, 1.8, -0.4, 1);
+                const Eigen::Vector4f roof_min(-1.5, -3, -3, 1);
+                const Eigen::Vector4f roof_max(2, 3.5, 3, 1);
                 cloud_down = filter.boxFilter(cloud_down, roof_min, roof_max, true); // Remove roof outliers
                 std::cout << ", Filtered points: " << cloud_down->points.size() << std::endl;
                 
                 /*------ 3. Statistical Outlier Removal ------*/
-                cloud_down = filter.StatisticalOutlierRemoval(cloud_down, 30, 2.0);
+                cloud_down = filter.StatisticalOutlierRemoval(cloud_down, 50, 1.0);
 
                 /*------ 4. Plane Segmentation ------*/
                 const float SENSOR_HEIGHT = 2;
@@ -129,7 +147,11 @@ int32_t main(int32_t argc, char **argv) {
                     *cloud_previous = *cloud_other;
                     *cloud_final += *cloud_previous;
                     global_transMatrix = lidarodom.lidar_to_GPS_IMU* global_transMatrix;
-                    std::cout << "Global trans matrix: " << global_transMatrix << std::endl;
+                    
+                    //init globlal transmatrix  
+                    Eigen::Matrix<float, 4, 1> quat_pre_init = lidarodom.Euler2Quaternion(roll, pitch, yaw);
+                    Eigen::Matrix<float, 3, 3> quat_init_rotmat = lidarodom.Quaternion2Rotation(quat_pre_init);
+                    lidarodom.Global_GPS_trans_init.block(0,0,3,3)= quat_init_rotmat;
                 }
                 else{
                     std::cout << "Registration start ..." << std::endl;

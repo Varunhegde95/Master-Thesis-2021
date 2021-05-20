@@ -39,7 +39,7 @@ int32_t main(int32_t argc, char **argv) {
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
 
         // Handler to receive data from sim-sensors (realized as C++ lambda).
-        std::mutex UKFReadingMutex; // EKF Reading Mutex
+        std::mutex UKFReadingMutex; // UKF Reading Mutex
         std::mutex RawReadingMutex; // Raw GPS measure position
         std::mutex LidarReadingMutex; // Lidar odometry position
 

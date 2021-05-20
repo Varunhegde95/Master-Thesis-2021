@@ -131,6 +131,9 @@ int32_t main(int32_t argc, char **argv) {
                     movement.x(static_cast<float>  (ukf.x_f_(0, 0)));  // Position X
                     movement.y(static_cast<float>  (ukf.x_f_(1, 0)));  // Position Y
                     movement.vx(static_cast<float> (ukf.x_f_(3, 0)));  // Speed Vf
+                    movement.pitch(static_cast<float>  (ukf.x_f_(4, 0)));  // Pitch
+                    movement.roll(static_cast<float>   (ukf.x_f_(5, 0)));  // Roll
+                    movement.yaw(static_cast<float>    (ukf.x_f_(6, 0)));  // Yaw
                     od4.send(movement, ts, SENDER_ID);
                 }
                 //Sending measure position to opendlv::sensor::Position

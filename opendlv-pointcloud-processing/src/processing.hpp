@@ -682,7 +682,7 @@ public:
 	Eigen::Matrix4f GPS_IMU_to_lidar;  
 	Eigen::Matrix4f lidar_to_GPS_IMU;
 	Eigen::Matrix<float, 4, 1> Lidar_trans;
-
+	Eigen::Matrix4f Global_GPS_trans_init;
     // Constructor
     LidarOdometry() = default;
 
@@ -710,6 +710,8 @@ public:
 		GPS_IMU_to_lidar(1,3)= 3.195559e-01;
 		GPS_IMU_to_lidar(2,3)= -7.997231e-01; 
 		lidar_to_GPS_IMU = GPS_IMU_to_lidar.inverse();
+
+		Global_GPS_trans_init = Eigen::Matrix4f::Identity();
 	}
 
 	/**
@@ -738,7 +740,7 @@ public:
 	 * @return Eigen::Matrix<float, 3, 3> 
 	 */
 	Eigen::Matrix<float, 3, 3> 
-	 Quaternion2Rotation(const Eigen::Matrix4f &q){
+	 Quaternion2Rotation(const Eigen::MatrixXf &q){
 		auto q0(q(0, 0));
 		auto q1(q(1, 0));
 		auto q2(q(2, 0));
