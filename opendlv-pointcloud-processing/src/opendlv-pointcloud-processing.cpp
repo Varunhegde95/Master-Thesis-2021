@@ -64,7 +64,7 @@ int32_t main(int32_t argc, char **argv) {
         Eigen::Matrix4f NDT_transMatrix (Eigen::Matrix4f::Identity());           // NDT transformation
         Eigen::Matrix4f ICP_transMatrix (Eigen::Matrix4f::Identity());
         Eigen::Matrix4f global_transMatrix (Eigen::Matrix4f::Identity());
-
+       
         //Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
         // Handler to receive data from sim-sensors (realized as C++ lambda).
@@ -146,12 +146,14 @@ int32_t main(int32_t argc, char **argv) {
                     std::cout << "Frame [" << NUM << "]: Set up <cloud_previous>." << std::endl;
                     *cloud_previous = *cloud_other;
                     *cloud_final += *cloud_previous;
-                    global_transMatrix = lidarodom.lidar_to_GPS_IMU* global_transMatrix;
                     
                     //init globlal transmatrix  
                     Eigen::Matrix<float, 4, 1> quat_pre_init = lidarodom.Euler2Quaternion(roll, pitch, yaw);
                     Eigen::Matrix<float, 3, 3> quat_init_rotmat = lidarodom.Quaternion2Rotation(quat_pre_init);
                     lidarodom.Global_GPS_trans_init.block(0,0,3,3)= quat_init_rotmat;
+                    lidarodom.Lidar_global_odom_actual = lidarodom.Global_GPS_trans_init * global_transMatrix;
+                    lidarodom.Lidar_global_odom_actual = lidarodom.GPS_IMU_to_lidar * lidarodom.Lidar_global_odom_actual;
+                    
                 }
                 else{
                     std::cout << "Registration start ..." << std::endl;
@@ -171,13 +173,16 @@ int32_t main(int32_t argc, char **argv) {
                     /*-------- [3]. Transfer aligned cloud into global coordinate --------*/
                     pcl::transformPointCloud (*cloud_ICP_output, *cloud_global_trans, global_transMatrix);
                     global_transMatrix = global_transMatrix * ICP_transMatrix.inverse() * NDT_transMatrix.inverse();
-
+                    lidarodom.Lidar_global_odom_actual = lidarodom.Lidar_global_odom_actual * ICP_transMatrix.inverse() * NDT_transMatrix.inverse();
                     /*-------- [4]. Stitch aligned clouds --------*/
                     *cloud_final += *cloud_global_trans;
                     *cloud_previous = *cloud_now;
 
                     // states order x,y,z,pitch,roll,yaw
-                    std::vector<float> States_from_trans = lidarodom.Transformmatrix_to_states(global_transMatrix);
+
+                    lidarodom.Lidar_global_odom_compare = lidarodom.lidar_to_GPS_IMU * lidarodom.Lidar_global_odom_actual;
+                    //std::vector<float> States_from_trans = lidarodom.Transformmatrix_to_states(lidarodom.Lidar_global_odom_actual); % To plot the actual trajectory of lidar on GT
+                    std::vector<float> States_from_trans = lidarodom.Transformmatrix_to_states(lidarodom.Lidar_global_odom_compare);
                     lidarodom.Lidar_trans(0,0) = States_from_trans[0];
                     lidarodom.Lidar_trans(1,0) = States_from_trans[1];
 

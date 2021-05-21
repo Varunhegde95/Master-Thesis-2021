@@ -683,6 +683,8 @@ public:
 	Eigen::Matrix4f lidar_to_GPS_IMU;
 	Eigen::Matrix<float, 4, 1> Lidar_trans;
 	Eigen::Matrix4f Global_GPS_trans_init;
+	Eigen::Matrix4f Lidar_global_odom_actual;
+	Eigen::Matrix4f Lidar_global_odom_compare;
     // Constructor
     LidarOdometry() = default;
 
@@ -712,6 +714,8 @@ public:
 		lidar_to_GPS_IMU = GPS_IMU_to_lidar.inverse();
 
 		Global_GPS_trans_init = Eigen::Matrix4f::Identity();
+		Lidar_global_odom_actual = Eigen::Matrix4f::Identity();
+		Lidar_global_odom_compare = Eigen::Matrix4f::Identity();
 	}
 
 	/**
