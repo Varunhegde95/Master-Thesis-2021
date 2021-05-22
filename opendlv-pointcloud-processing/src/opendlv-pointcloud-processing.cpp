@@ -70,13 +70,17 @@ int32_t main(int32_t argc, char **argv) {
         // Handler to receive data from sim-sensors (realized as C++ lambda).
         
         std::mutex UKFReadingMutex; // EKF Reading Mutex
+        float velocityx;
+        float velocityy;
         float pitch(0.0);
         float roll(0.0);
         float yaw(0.0);
 
-        auto onUKFReading{[&UKFReadingMutex, &pitch, &roll, &yaw](cluon::data::Envelope &&envelope) {
+        auto onUKFReading{[&UKFReadingMutex, &pitch, &roll, &yaw ,&velocityx, &velocityy](cluon::data::Envelope &&envelope) {
             auto msg = cluon::extractMessage<opendlv::fused::Movement>(std::move(envelope));
             std::lock_guard<std::mutex> lck(UKFReadingMutex);
+            velocityx = msg.vx();
+            velocityy = msg.vy();
             pitch = msg.pitch();  // Pitch
             roll  = msg.roll();   // Roll
             yaw   = msg.yaw();    // Yaw
@@ -141,6 +145,8 @@ int32_t main(int32_t argc, char **argv) {
                 std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.35f); // SVD method (faster than RANSAC)
                 timerCalculator(plane_timer, "Plane segmentation");
 
+                float velocity_net = float(sqrt(pow(velocityx,2)+pow(velocityy,2)));
+
                 /*------ 5. Registration ------*/
                 if(NUM == 0){
                     std::cout << "Frame [" << NUM << "]: Set up <cloud_previous>." << std::endl;
@@ -155,13 +161,13 @@ int32_t main(int32_t argc, char **argv) {
                     lidarodom.Lidar_global_odom_actual = lidarodom.GPS_IMU_to_lidar * lidarodom.Lidar_global_odom_actual;
                     
                 }
-                else{
+                else if(velocity_net > 0.05){
                     std::cout << "Registration start ..." << std::endl;
                     *cloud_now = *cloud_other;   
 
                     /*----- [1] NDT Registration -----*/
                     auto timer_registration = std::chrono::system_clock::now(); // Start NDT timer
-                    std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_OMP(cloud_previous, cloud_now, initial_guess_transMatrix, 2.0);
+                    std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_OMP(cloud_previous, cloud_now, initial_guess_transMatrix, 2.5);
                     timerCalculator(timer_registration, "NDT-OMP");
 
                     /*----- [2] ICP Registration -----*/
