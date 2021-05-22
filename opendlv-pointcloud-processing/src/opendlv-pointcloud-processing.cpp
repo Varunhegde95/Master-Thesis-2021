@@ -64,23 +64,28 @@ int32_t main(int32_t argc, char **argv) {
         Eigen::Matrix4f NDT_transMatrix (Eigen::Matrix4f::Identity());           // NDT transformation
         Eigen::Matrix4f ICP_transMatrix (Eigen::Matrix4f::Identity());
         Eigen::Matrix4f global_transMatrix (Eigen::Matrix4f::Identity());
-
+       
         //Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
         // Handler to receive data from sim-sensors (realized as C++ lambda).
         
         std::mutex UKFReadingMutex; // EKF Reading Mutex
-        float pitch(0.0);
-        float roll(0.0);
-        float yaw(0.0);
+        float velocityx(0.0f);
+        float velocityy(0.0f);
+        float pitch(0.0f);
+        float roll(0.0f);
+        float yaw(0.0f);
+        float velocity_net(0.0f);
 
-        auto onUKFReading{[&UKFReadingMutex, &pitch, &roll, &yaw](cluon::data::Envelope &&envelope) {
+        auto onUKFReading{[&UKFReadingMutex, &pitch, &roll, &yaw ,&velocityx, &velocityy, &velocity_net](cluon::data::Envelope &&envelope) {
             auto msg = cluon::extractMessage<opendlv::fused::Movement>(std::move(envelope));
             std::lock_guard<std::mutex> lck(UKFReadingMutex);
+            velocityx = msg.vx();
+            velocityy = msg.vy();
             pitch = msg.pitch();  // Pitch
             roll  = msg.roll();   // Roll
             yaw   = msg.yaw();    // Yaw
-            std::cout << "-----YAW: " << yaw << std::endl;
+            velocity_net = float(sqrt(pow(velocityx,2)+pow(velocityy,2)));
         }};
 
         // Register our lambda for the message identifier
@@ -141,49 +146,58 @@ int32_t main(int32_t argc, char **argv) {
                 std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.35f); // SVD method (faster than RANSAC)
                 timerCalculator(plane_timer, "Plane segmentation");
 
+                float velocity_net = float(sqrt(pow(velocityx,2)+pow(velocityy,2)));
+
                 /*------ 5. Registration ------*/
                 if(NUM == 0){
                     std::cout << "Frame [" << NUM << "]: Set up <cloud_previous>." << std::endl;
                     *cloud_previous = *cloud_other;
                     *cloud_final += *cloud_previous;
-                    global_transMatrix = lidarodom.lidar_to_GPS_IMU* global_transMatrix;
                     
                     //init globlal transmatrix  
                     Eigen::Matrix<float, 4, 1> quat_pre_init = lidarodom.Euler2Quaternion(roll, pitch, yaw);
                     Eigen::Matrix<float, 3, 3> quat_init_rotmat = lidarodom.Quaternion2Rotation(quat_pre_init);
                     lidarodom.Global_GPS_trans_init.block(0,0,3,3)= quat_init_rotmat;
+                    lidarodom.Lidar_global_odom_actual = lidarodom.Global_GPS_trans_init * global_transMatrix;
+                    lidarodom.Lidar_global_odom_actual = lidarodom.GPS_IMU_to_lidar * lidarodom.Lidar_global_odom_actual;
+                    
                 }
                 else{
-                    std::cout << "Registration start ..." << std::endl;
-                    *cloud_now = *cloud_other;   
+                    if(velocity_net > 0.05){
+                        std::cout << "Registration start ..." << std::endl;
+                        *cloud_now = *cloud_other;   
 
-                    /*----- [1] NDT Registration -----*/
-                    auto timer_registration = std::chrono::system_clock::now(); // Start NDT timer
-                    std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_OMP(cloud_previous, cloud_now, initial_guess_transMatrix, 2.0);
-                    timerCalculator(timer_registration, "NDT-OMP");
+                        /*----- [1] NDT Registration -----*/
+                        auto timer_registration = std::chrono::system_clock::now(); // Start NDT timer
+                        std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_OMP(cloud_previous, cloud_now, initial_guess_transMatrix, 2.5);
+                        timerCalculator(timer_registration, "NDT-OMP");
 
-                    /*----- [2] ICP Registration -----*/
-                    auto timer_icp = std::chrono::system_clock::now(); 
-                    std::tie(cloud_ICP, ICP_transMatrix) = registration.ICP_OMP(cloud_NDT, cloud_now, NDT_transMatrix);
-                    pcl::transformPointCloud (*cloud_now, *cloud_ICP_output, ICP_transMatrix.inverse() * NDT_transMatrix.inverse());
-                    timerCalculator(timer_icp, "ICP-OMP");
+                        /*----- [2] ICP Registration -----*/
+                        auto timer_icp = std::chrono::system_clock::now(); 
+                        std::tie(cloud_ICP, ICP_transMatrix) = registration.ICP_OMP(cloud_NDT, cloud_now, NDT_transMatrix);
+                        pcl::transformPointCloud (*cloud_now, *cloud_ICP_output, ICP_transMatrix.inverse() * NDT_transMatrix.inverse());
+                        timerCalculator(timer_icp, "ICP-OMP");
 
-                    /*-------- [3]. Transfer aligned cloud into global coordinate --------*/
-                    pcl::transformPointCloud (*cloud_ICP_output, *cloud_global_trans, global_transMatrix);
-                    global_transMatrix = global_transMatrix * ICP_transMatrix.inverse() * NDT_transMatrix.inverse();
+                        /*-------- [3]. Transfer aligned cloud into global coordinate --------*/
+                        pcl::transformPointCloud (*cloud_ICP_output, *cloud_global_trans, global_transMatrix);
+                        global_transMatrix = global_transMatrix * ICP_transMatrix.inverse() * NDT_transMatrix.inverse();
+                        lidarodom.Lidar_global_odom_actual = lidarodom.Lidar_global_odom_actual * ICP_transMatrix.inverse() * NDT_transMatrix.inverse();
+                        
+                        /*-------- [4]. Stitch aligned clouds --------*/
+                        *cloud_final += *cloud_global_trans;
+                        *cloud_previous = *cloud_now;
 
-                    /*-------- [4]. Stitch aligned clouds --------*/
-                    *cloud_final += *cloud_global_trans;
-                    *cloud_previous = *cloud_now;
+                        // states order x,y,z,pitch,roll,yaw
+                        lidarodom.Lidar_global_odom_compare = lidarodom.lidar_to_GPS_IMU * lidarodom.Lidar_global_odom_actual;
+                        //std::vector<float> States_from_trans = lidarodom.Transformmatrix_to_states(lidarodom.Lidar_global_odom_actual); % To plot the actual trajectory of lidar on GT
+                        std::vector<float> States_from_trans = lidarodom.Transformmatrix_to_states(lidarodom.Lidar_global_odom_compare);
+                        lidarodom.Lidar_trans(0,0) = States_from_trans[0];
+                        lidarodom.Lidar_trans(1,0) = States_from_trans[1];
 
-                    // states order x,y,z,pitch,roll,yaw
-                    std::vector<float> States_from_trans = lidarodom.Transformmatrix_to_states(global_transMatrix);
-                    lidarodom.Lidar_trans(0,0) = States_from_trans[0];
-                    lidarodom.Lidar_trans(1,0) = States_from_trans[1];
-
-                    auto registration_time = timerCalculator(timer_registration, "Registration"); // Print time
-                    if(registration_time > 0.333)
-                        overtime_count ++;
+                        auto registration_time = timerCalculator(timer_registration, "Registration"); // Print time
+                        if(registration_time > 0.333)
+                            overtime_count ++;
+                    }
                 }
 
                 //Sending message to opendlv::lidarodom::Position
@@ -203,8 +217,7 @@ int32_t main(int32_t argc, char **argv) {
                 }
                 if(DISPLAY){
                     viewer.removeAllPointClouds();
-                    visual.showPointcloud(viewer, cloud_final, 2, GREEN, "PCD Preprocessing");
-                    //visual.showPointcloud(viewer, cloud_road, 2, RED, "PCD road");
+                    visual.showPointcloud_height(viewer, cloud_final, 2, "PCD Preprocessing");
                     viewer.spinOnce();
                 }
                 NUM ++;
