@@ -146,8 +146,6 @@ int32_t main(int32_t argc, char **argv) {
                 std::tie(cloud_road, cloud_other) = segmentation.PlaneEstimation(cloud_down, RoughGroundPoints, 0.35f); // SVD method (faster than RANSAC)
                 timerCalculator(plane_timer, "Plane segmentation");
 
-                float velocity_net = float(sqrt(pow(velocityx,2)+pow(velocityy,2)));
-
                 /*------ 5. Registration ------*/
                 if(NUM == 0){
                     std::cout << "Frame [" << NUM << "]: Set up <cloud_previous>." << std::endl;
