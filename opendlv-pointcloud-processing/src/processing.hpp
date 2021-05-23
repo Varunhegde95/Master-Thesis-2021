@@ -603,7 +603,7 @@ public:
 	 * @param resolution 
 	 * @return std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f> 
 	 */
-	std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f>
+	std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f, double>
 	 NDT_OMP(const typename pcl::PointCloud<PointT>::Ptr &cloud_source,
 	 		 const typename pcl::PointCloud<PointT>::Ptr &cloud_target, 
 			 const Eigen::Matrix4f &init_guess,
@@ -626,7 +626,7 @@ public:
 			std::cout << SourceToTarget << std::endl;
 			pcl::transformPointCloud(*cloud_source, *output, SourceToTarget);
 		}
-		return std::make_tuple(output, SourceToTarget);
+		return std::make_tuple(output, SourceToTarget, ndt_omp.getFitnessScore());
 	}
 
 	/**
@@ -665,7 +665,7 @@ public:
 		return std::make_tuple(output, SourceToTarget);
 	}
 
-	std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f> 
+	std::tuple<typename pcl::PointCloud<PointT>::Ptr, Eigen::Matrix4f, double> 
 	 ICP_OMP(const typename pcl::PointCloud<PointT>::Ptr &cloud_source,
              const typename pcl::PointCloud<PointT>::Ptr &cloud_target, 
              const Eigen::Matrix4f &init_transform){
@@ -681,7 +681,7 @@ public:
 			SourceToTarget = gicp_omp.getFinalTransformation();
 			std::cout << SourceToTarget << std::endl;
 		}
-		return std::make_tuple(output, SourceToTarget);
+		return std::make_tuple(output, SourceToTarget, gicp_omp.getFitnessScore());
 	}
 
 };

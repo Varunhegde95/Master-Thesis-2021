@@ -50,6 +50,11 @@ int32_t main(int32_t argc, char **argv) {
         // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
 
+        //------ Initialize CSV file ------//
+        std::ofstream SavingCSV;
+        SavingCSV.trunc;  // Clear the CSV file
+        SavingCSV.open("/opt/saving/UKF.csv", std::ios::out);
+
         // Initialize handler to receive data 
         std::mutex GpsReadingMutex;       // GPS Data [wgs84] Reading Mutex
         std::mutex AccReadingMutex;       // IMU Acceleration Reading Mutex
@@ -100,7 +105,7 @@ int32_t main(int32_t argc, char **argv) {
         od4.dataTrigger(opendlv::logic::sensation::Geolocation::ID(), onGpsReading);
 
         uint64_t frameCount{0};
-        auto atFrequency{[&flag, &od4, &ukf, &odom, &IMU_FREQ, &sensor_reading, &sensor_reading_pre, &frameCount, &SENDER_ID, &VERBOSE]() -> bool
+        auto atFrequency{[&flag, &od4, &ukf, &odom, &IMU_FREQ, &sensor_reading, &sensor_reading_pre, &frameCount, &SavingCSV, &SENDER_ID, &VERBOSE]() -> bool
         {
             if (sensor_reading.lon == 0 && sensor_reading.lat == 0 && sensor_reading.alt == 0){ // Wait until receive data 
                 frameCount = 0;
@@ -155,9 +160,14 @@ int32_t main(int32_t argc, char **argv) {
                         od4.send(position, timestamp, SENDER_ID);
                     }
                 }
+                SavingCSV << std::to_string(ukf.x_f_(0, 0)) << ',' << std::to_string(ukf.x_f_(1, 0)) << ',' << std::to_string(ukf.x_f_(3, 0))
+                                    << ',' << std::to_string(ukf.x_f_(4, 0)) << ',' << std::to_string(ukf.x_f_(5, 0)) 
+                                    << ',' << std::to_string(ukf.x_f_(5, 0)) << std::endl;
                 frameCount ++;
-                if(flag == 1)
+                if(flag == 1){
+                    SavingCSV.close(); // Close CSV file
                     return 0;
+                }
             }
             return true;
         }};

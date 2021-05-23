@@ -70,14 +70,17 @@ int32_t main(int32_t argc, char **argv) {
         // Handler to receive data from sim-sensors (realized as C++ lambda).
         
         std::mutex DatasetFlagMutex;
-        int flag(0);
         std::mutex UKFReadingMutex; // EKF Reading Mutex
+        int flag(0);
         float velocityx(0.0f); // Initialization for UKF Reading
         float velocityy(0.0f);
         float pitch(0.0f);
         float roll(0.0f);
         float yaw(0.0f);
         float velocity_net(0.0f);
+        double NDT_score;
+        double ICP_score;
+        double Registration_score(0.0d);
 
         UKF_Reading UKF_Reading_Pre;
         UKF_Reading UKF_Reading_Now;
@@ -105,6 +108,11 @@ int32_t main(int32_t argc, char **argv) {
 
         std::cout << "Connecting to shared memory " << NAME_READ << std::endl;
         std::unique_ptr<cluon::SharedMemory> shmRead{new cluon::SharedMemory{NAME_READ}};
+
+        //------ Initialize CSV file ------//
+        std::ofstream SavingCSV;
+        SavingCSV.trunc;  // Clear the CSV file
+        SavingCSV.open("/opt/saving/Registration.csv", std::ios::out);
 
         if (shmRead && shmRead->valid() ) {
             std::clog << argv[0] << ": Attached to shared PCD memory '" 
@@ -196,12 +204,12 @@ int32_t main(int32_t argc, char **argv) {
                     
                         /*----- [1] NDT Registration -----*/
                         auto timer_registration = std::chrono::system_clock::now(); // Start NDT timer
-                        std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_OMP(cloud_previous, cloud_now, initial_guess_transMatrix, 4.0);
+                        std::tie(cloud_NDT, NDT_transMatrix, NDT_score) = registration.NDT_OMP(cloud_previous, cloud_now, initial_guess_transMatrix, 4.0);
                         timerCalculator(timer_registration, "NDT-OMP");
 
                         /*----- [2] ICP Registration -----*/
                         auto timer_icp = std::chrono::system_clock::now(); 
-                        std::tie(cloud_ICP, ICP_transMatrix) = registration.ICP_OMP(cloud_NDT, cloud_now, NDT_transMatrix);
+                        std::tie(cloud_ICP, ICP_transMatrix, ICP_score) = registration.ICP_OMP(cloud_NDT, cloud_now, NDT_transMatrix);
                         pcl::transformPointCloud (*cloud_now, *cloud_ICP_output, ICP_transMatrix.inverse() * NDT_transMatrix.inverse());
                         timerCalculator(timer_icp, "ICP-OMP");
 
@@ -222,6 +230,10 @@ int32_t main(int32_t argc, char **argv) {
                         lidarodom.Lidar_trans(1,0) = States_from_trans[1];
                         
                         UKF_Reading_Pre = UKF_Reading_Now;
+
+                        SavingCSV << std::to_string(UKF_Reading_Now.X) << ',' << std::to_string(UKF_Reading_Now.Y) << ',' << std::to_string(lidarodom.Lidar_trans(0,0))
+                                    << ',' << std::to_string(lidarodom.Lidar_trans(1,0)) << std::endl;
+                        Registration_score += ICP_score;
 
                         auto registration_time = timerCalculator(timer_registration, "Registration"); // Print time
                         if(registration_time > 0.4)
@@ -249,15 +261,19 @@ int32_t main(int32_t argc, char **argv) {
                     visual.showPointcloud_height(viewer, cloud_final, 2, "PCD Preprocessing");
                     viewer.spinOnce();
                 }
-                NUM ++;
 
                 if(flag == 1){
-                    std::cout << "Dataset Finish, Save the registrated point cloud ...." << std::endl;
-                    std::string filename("opt/saving/Registration.pcd");
+                    std::cout << "\n--------------------------------------------------" << std::endl;
+                    Registration_score = Registration_score / NUM;
+                    std::cout << "Average registration score is: " << Registration_score << std::endl;
+                    std::string filename("/opt/saving/Registration.pcd");
+                    std::cout << "Dataset Finish, Save the registrated point cloud to [" << filename << "]" << std::endl;
                     pcl::PCDWriter writer;
-                    writer.write(filename,*cloud_final);
+                    writer.write<pcl::PointXYZ>(filename, *cloud_final); // Save registrated point cloud into PCD file
+                    SavingCSV.close(); // Close CSV file
                     return 0;
                 }
+                NUM ++;
             }
         }
         retCode = 0;
