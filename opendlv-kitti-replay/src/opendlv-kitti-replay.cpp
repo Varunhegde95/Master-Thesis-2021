@@ -73,6 +73,14 @@ int32_t main(int32_t argc, char **argv) {
             }
             timerCalculator(timer_oxts, "Loading all KITTI oxts data");
 
+            // //Sending dataset start flag = 0
+            // cluon::data::TimeStamp ts_start{cluon::time::now()};
+            // {
+            //     opendlv::kittireplay::Flag flag;
+            //     flag.flag(static_cast<int>  (0));  // Start flag = 0
+            //     od4.send(flag, ts_start, IDSENDER);
+            // }
+
             int16_t NUM = 0;
             uint32_t sizecloud = 0;
 
@@ -83,7 +91,7 @@ int32_t main(int32_t argc, char **argv) {
                 // Copy point cloud into shared memory
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>);
                 cloud_ptr = loadKitti(files_lidar, NUM);
-
+                
                 if(NUM == 0)
                     sizecloud = 100000;
                 // sizecloud = (uint32_t) cloud_ptr->points.size()*0.8;
@@ -141,6 +149,13 @@ int32_t main(int32_t argc, char **argv) {
 
             while(NUM != fileNum && od4.isRunning()){
                 od4.timeTrigger(FREQ, atFrequency);
+            }
+            //Sending dataset finish flag
+            cluon::data::TimeStamp ts_finish{cluon::time::now()};
+            {
+                opendlv::kittireplay::Flag flag;
+                flag.flag(static_cast<int>  (1));  // Finish flag = 1
+                od4.send(flag, ts_finish, IDSENDER);
             }
             retCode = 0;
         }

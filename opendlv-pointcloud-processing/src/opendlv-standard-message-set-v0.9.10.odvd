@@ -399,3 +399,7 @@ message opendlv.lidarodom.Position [id = 9054] {
   float y [id = 2];
   float z [id = 3];
 }
+
+message opendlv.kittireplay.Flag [id = 9055]{
+  int flag [id = 1];
+}

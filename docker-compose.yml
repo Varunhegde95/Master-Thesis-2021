@@ -10,10 +10,6 @@ services:
         network_mode: "host"
         ipc: "host"
         volumes:
-<<<<<<< HEAD
-=======
-        # - ${HOME}/gitrepo/Learning_PCL/Test_data/2011_09_26/2011_09_26/2011_09_26_drive_0093_sync:/opt/recordings
->>>>>>> lidar_odom_vel
         - ${HOME}/Learning_PCL/Test_data/2011_09_26/2011_09_26_drive_0005_sync:/opt/recordings
         - /tmp:/tmp
         network_mode: "host"
@@ -35,6 +31,7 @@ services:
         #- "kitti-replay"
         volumes:
         - /tmp:/tmp
+        - ${HOME}/Master-Thesis-2021/SavePCD:/opt/saving
         command: "--cid=111 --freq=10 --name_read=123.pcd --display --verbose"
 
     unscented-kalman-filter:

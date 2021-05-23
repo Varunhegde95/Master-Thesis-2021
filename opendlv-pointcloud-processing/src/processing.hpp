@@ -88,6 +88,17 @@ struct Color{
 	{}
 };
 
+class UKF_Reading{
+    public:
+        UKF_Reading(){}; // UKF Reading for calculating NDT initial guessing
+        float X = 0;  
+        float Y = 0;  
+        float Z = 0;  
+        float pitch = 0;  
+		float roll  = 0;  
+		float yaw   = 0;  
+};
+
 /*-------------------------------------------------------------------------------------*/
 
 /** 

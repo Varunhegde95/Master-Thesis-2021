@@ -69,13 +69,18 @@ int32_t main(int32_t argc, char **argv) {
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
         // Handler to receive data from sim-sensors (realized as C++ lambda).
         
+        std::mutex DatasetFlagMutex;
+        int flag(0);
         std::mutex UKFReadingMutex; // EKF Reading Mutex
-        float velocityx(0.0f);
+        float velocityx(0.0f); // Initialization for UKF Reading
         float velocityy(0.0f);
         float pitch(0.0f);
         float roll(0.0f);
         float yaw(0.0f);
         float velocity_net(0.0f);
+
+        UKF_Reading UKF_Reading_Pre;
+        UKF_Reading UKF_Reading_Now;
 
         auto onUKFReading{[&UKFReadingMutex, &pitch, &roll, &yaw ,&velocityx, &velocityy, &velocity_net](cluon::data::Envelope &&envelope) {
             auto msg = cluon::extractMessage<opendlv::fused::Movement>(std::move(envelope));
@@ -88,7 +93,14 @@ int32_t main(int32_t argc, char **argv) {
             velocity_net = float(sqrt(pow(velocityx,2)+pow(velocityy,2)));
         }};
 
+        auto onFlagReading{[&DatasetFlagMutex, &flag](cluon::data::Envelope &&envelope) {
+            auto msg = cluon::extractMessage<opendlv::kittireplay::Flag>(std::move(envelope));
+            std::lock_guard<std::mutex> lck(DatasetFlagMutex);
+            flag = msg.flag();
+        }};
+
         // Register our lambda for the message identifier
+        od4.dataTrigger(opendlv::kittireplay::Flag::ID(), onFlagReading);
         od4.dataTrigger(opendlv::fused::Movement::ID(), onUKFReading);
 
         std::cout << "Connecting to shared memory " << NAME_READ << std::endl;
@@ -151,23 +163,40 @@ int32_t main(int32_t argc, char **argv) {
                     std::cout << "Frame [" << NUM << "]: Set up <cloud_previous>." << std::endl;
                     *cloud_previous = *cloud_other;
                     *cloud_final += *cloud_previous;
+                    UKF_Reading_Pre.X = velocityx;
+                    UKF_Reading_Pre.Y = velocityy;
+                    UKF_Reading_Pre.pitch = pitch;
+                    UKF_Reading_Pre.roll  = roll;
+                    UKF_Reading_Pre.yaw   = yaw;
                     
                     //init globlal transmatrix  
                     Eigen::Matrix<float, 4, 1> quat_pre_init = lidarodom.Euler2Quaternion(roll, pitch, yaw);
                     Eigen::Matrix<float, 3, 3> quat_init_rotmat = lidarodom.Quaternion2Rotation(quat_pre_init);
-                    lidarodom.Global_GPS_trans_init.block(0,0,3,3)= quat_init_rotmat;
+                    lidarodom.Global_GPS_trans_init.block(0, 0, 3, 3)= quat_init_rotmat;
                     lidarodom.Lidar_global_odom_actual = lidarodom.Global_GPS_trans_init * global_transMatrix;
                     lidarodom.Lidar_global_odom_actual = lidarodom.GPS_IMU_to_lidar * lidarodom.Lidar_global_odom_actual;
-                    
                 }
                 else{
                     if(velocity_net > 0.05){
                         std::cout << "Registration start ..." << std::endl;
                         *cloud_now = *cloud_other;   
 
+                        UKF_Reading_Now.X = velocityx;
+                        UKF_Reading_Now.Y = velocityy;
+                        UKF_Reading_Now.pitch = pitch;
+                        UKF_Reading_Now.roll  = roll;
+                        UKF_Reading_Now.yaw   = yaw;
+                        Eigen::Matrix<float, 4, 1> quat_UKF = lidarodom.Euler2Quaternion(UKF_Reading_Now.roll - UKF_Reading_Pre.roll, 
+                                UKF_Reading_Now.pitch - UKF_Reading_Pre.roll, UKF_Reading_Now.yaw - UKF_Reading_Pre.yaw);
+                        Eigen::Matrix<float, 3, 3> rotation_UKF = lidarodom.Quaternion2Rotation(quat_UKF);
+                        initial_guess_transMatrix.block(0, 0, 3, 3) = rotation_UKF;
+                        // initial_guess_transMatrix(0, 3) = UKF_Reading_Now.X - UKF_Reading_Pre.X;
+                        // initial_guess_transMatrix(1, 3) = UKF_Reading_Now.Y - UKF_Reading_Pre.Y;
+                        // initial_guess_transMatrix(2, 3) = UKF_Reading_Now.Z - UKF_Reading_Pre.Z;
+                    
                         /*----- [1] NDT Registration -----*/
                         auto timer_registration = std::chrono::system_clock::now(); // Start NDT timer
-                        std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_OMP(cloud_previous, cloud_now, initial_guess_transMatrix, 2.5);
+                        std::tie(cloud_NDT, NDT_transMatrix) = registration.NDT_OMP(cloud_previous, cloud_now, initial_guess_transMatrix, 4.0);
                         timerCalculator(timer_registration, "NDT-OMP");
 
                         /*----- [2] ICP Registration -----*/
@@ -191,9 +220,11 @@ int32_t main(int32_t argc, char **argv) {
                         std::vector<float> States_from_trans = lidarodom.Transformmatrix_to_states(lidarodom.Lidar_global_odom_compare);
                         lidarodom.Lidar_trans(0,0) = States_from_trans[0];
                         lidarodom.Lidar_trans(1,0) = States_from_trans[1];
+                        
+                        UKF_Reading_Pre = UKF_Reading_Now;
 
                         auto registration_time = timerCalculator(timer_registration, "Registration"); // Print time
-                        if(registration_time > 0.333)
+                        if(registration_time > 0.4)
                             overtime_count ++;
                     }
                 }
@@ -219,6 +250,14 @@ int32_t main(int32_t argc, char **argv) {
                     viewer.spinOnce();
                 }
                 NUM ++;
+
+                if(flag == 1){
+                    std::cout << "Dataset Finish, Save the registrated point cloud ...." << std::endl;
+                    std::string filename("opt/saving/Registration.pcd");
+                    pcl::PCDWriter writer;
+                    writer.write(filename,*cloud_final);
+                    return 0;
+                }
             }
         }
         retCode = 0;

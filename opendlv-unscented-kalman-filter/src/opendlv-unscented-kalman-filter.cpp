@@ -54,9 +54,19 @@ int32_t main(int32_t argc, char **argv) {
         std::mutex GpsReadingMutex;       // GPS Data [wgs84] Reading Mutex
         std::mutex AccReadingMutex;       // IMU Acceleration Reading Mutex
         std::mutex GyroReadingMutex;      // IMU Gyroscope Reading Mutex
+        std::mutex DatasetFlagMutex;
 
         Sensor_Reading sensor_reading;
         Sensor_Reading sensor_reading_pre; // Used in UKF
+        int flag(0);
+
+        auto onFlagReading{[&DatasetFlagMutex, &flag](cluon::data::Envelope &&envelope) {
+            auto msg = cluon::extractMessage<opendlv::kittireplay::Flag>(std::move(envelope));
+            std::lock_guard<std::mutex> lck(DatasetFlagMutex);
+            flag = msg.flag();
+            if(flag == 1)
+                std::cout << "Dataset Finish...." << std::endl;
+        }};
 
         auto onGpsReading{[&GpsReadingMutex, &sensor_reading](cluon::data::Envelope &&envelope) {
             auto msg = cluon::extractMessage<opendlv::logic::sensation::Geolocation>(std::move(envelope));
@@ -84,12 +94,13 @@ int32_t main(int32_t argc, char **argv) {
             sensor_reading.vf  = msg.vx(); // Forward Speed (temporarily)
         }};
 
+        od4.dataTrigger(opendlv::kittireplay::Flag::ID(), onFlagReading);
         od4.dataTrigger(opendlv::sensor::Acceleration::ID(), onAccReading);
         od4.dataTrigger(opendlv::logic::sensation::Equilibrioception::ID(), onGyroReading);
         od4.dataTrigger(opendlv::logic::sensation::Geolocation::ID(), onGpsReading);
 
         uint64_t frameCount{0};
-        auto atFrequency{[&od4, &ukf, &odom, &IMU_FREQ, &sensor_reading, &sensor_reading_pre, &frameCount, &SENDER_ID, &VERBOSE]() -> bool
+        auto atFrequency{[&flag, &od4, &ukf, &odom, &IMU_FREQ, &sensor_reading, &sensor_reading_pre, &frameCount, &SENDER_ID, &VERBOSE]() -> bool
         {
             if (sensor_reading.lon == 0 && sensor_reading.lat == 0 && sensor_reading.alt == 0){ // Wait until receive data 
                 frameCount = 0;
@@ -99,12 +110,12 @@ int32_t main(int32_t argc, char **argv) {
                 if(frameCount == 0){
                     /*----- Initialize UKF -----*/
                     ukf.dt_ = (float)1 / IMU_FREQ;
-                    std::cout << "DT: " << ukf.dt_ << std::endl;
+                    // std::cout << "DT: " << ukf.dt_ << std::endl;
                     odom.Initialize();                    // Initialize Odometer
                     ukf.Initialize(odom, sensor_reading); // Initialize UKF Q, R, P0, x_f, p_f
                     sensor_reading_pre = sensor_reading;  // Initialize sensor_reading_pre for future odometer calculation
                     ukf.GetMeasurement(odom, sensor_reading); // Get first measurement (Actually not used, only for plotting.)
-                    std::cout << "Frame [" << frameCount << "] ";
+                    // std::cout << "Frame [" << frameCount << "] ";
                 }
                 else
                 {
@@ -116,39 +127,41 @@ int32_t main(int32_t argc, char **argv) {
                     ukf.GetMeasurement(odom, sensor_reading); // Get measurement for update step
                     ukf.Update(ukf.x_p_, ukf.p_p_, ukf.measurements_, odom); 
                     sensor_reading_pre = sensor_reading; // Update for next state
-                }
 
-                if(VERBOSE){
-                    std::cout << " Filtered State || " << "X: " << ukf.x_f_(0, 0) << ", Y: " << ukf.x_f_(1, 0) << ", Z: " << ukf.x_f_(2, 0) 
-                              << ", speed: " << ukf.x_f_(3, 0) << ", yaw: " << ukf.x_f_(6, 0) << ", Roll Rate: " << ukf.x_f_(8, 0)*180/M_PI 
-                              << ", Pitch Rate: " << ukf.x_f_(7, 0)*180/M_PI << ", Yaw Rate: " << ukf.x_f_(9, 0)*180/M_PI << " ..." << std::endl;
-                }
+                    if(VERBOSE){
+                        std::cout << " Filtered State || " << "X: " << ukf.x_f_(0, 0) << ", Y: " << ukf.x_f_(1, 0) << ", Z: " << ukf.x_f_(2, 0) 
+                                << ", speed: " << ukf.x_f_(3, 0) << ", yaw: " << ukf.x_f_(6, 0) << ", Roll Rate: " << ukf.x_f_(8, 0)*180/M_PI 
+                                << ", Pitch Rate: " << ukf.x_f_(7, 0)*180/M_PI << ", Yaw Rate: " << ukf.x_f_(9, 0)*180/M_PI << " ..." << std::endl;
+                    }
 
-                //Sending message to opendlv::fused::Movement
-                cluon::data::TimeStamp ts{cluon::time::now()};
-                {
-                    opendlv::fused::Movement movement;
-                    movement.x(static_cast<float>  (ukf.x_f_(0, 0)));  // Position X
-                    movement.y(static_cast<float>  (ukf.x_f_(1, 0)));  // Position Y
-                    movement.vx(static_cast<float> (ukf.x_f_(3, 0)));  // Speed Vf
-                    movement.pitch(static_cast<float>  (ukf.x_f_(4, 0)));  // Pitch
-                    movement.roll(static_cast<float>   (ukf.x_f_(5, 0)));  // Roll
-                    movement.yaw(static_cast<float>    (ukf.x_f_(6, 0)));  // Yaw
-                    od4.send(movement, ts, SENDER_ID);
-                }
-                //Sending measure position to opendlv::sensor::Position
-                cluon::data::TimeStamp timestamp{cluon::time::now()};
-                {
-                    opendlv::sensor::Position position;
-                    position.x(static_cast<float>  (ukf.measurements_(0, 0)));  // Measure Position X
-                    position.y(static_cast<float>  (ukf.measurements_(1, 0)));  // Measure Position Y
-                    od4.send(position, timestamp, SENDER_ID);
+                    //Sending message to opendlv::fused::Movement
+                    cluon::data::TimeStamp ts{cluon::time::now()};
+                    {
+                        opendlv::fused::Movement movement;
+                        movement.x(static_cast<float>  (ukf.x_f_(0, 0)));  // Position X
+                        movement.y(static_cast<float>  (ukf.x_f_(1, 0)));  // Position Y
+                        movement.vx(static_cast<float> (ukf.x_f_(3, 0)));  // Speed Vf
+                        movement.pitch(static_cast<float>  (ukf.x_f_(4, 0)));  // Pitch
+                        movement.roll(static_cast<float>   (ukf.x_f_(5, 0)));  // Roll
+                        movement.yaw(static_cast<float>    (ukf.x_f_(6, 0)));  // Yaw
+                        od4.send(movement, ts, SENDER_ID);
+                    }
+                    //Sending measure position to opendlv::sensor::Position
+                    cluon::data::TimeStamp timestamp{cluon::time::now()};
+                    {
+                        opendlv::sensor::Position position;
+                        position.x(static_cast<float>  (ukf.measurements_(0, 0)));  // Measure Position X
+                        position.y(static_cast<float>  (ukf.measurements_(1, 0)));  // Measure Position Y
+                        od4.send(position, timestamp, SENDER_ID);
+                    }
                 }
                 frameCount ++;
+                if(flag == 1)
+                    return 0;
             }
             return true;
         }};
- 
+        
         od4.timeTrigger(FREQ, atFrequency);
         retCode = 0;
     }
