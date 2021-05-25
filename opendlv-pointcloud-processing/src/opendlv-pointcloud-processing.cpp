@@ -196,8 +196,8 @@ int32_t main(int32_t argc, char **argv) {
                         UKF_Reading_Now.yaw   = yaw;
                         Eigen::Matrix<float, 4, 1> quat_UKF = lidarodom.Euler2Quaternion(UKF_Reading_Now.roll - UKF_Reading_Pre.roll, 
                                 UKF_Reading_Now.pitch - UKF_Reading_Pre.roll, UKF_Reading_Now.yaw - UKF_Reading_Pre.yaw);
-                        Eigen::Matrix<float, 3, 3> rotation_UKF = lidarodom.Quaternion2Rotation(quat_UKF);
-                        initial_guess_transMatrix.block(0, 0, 3, 3) = rotation_UKF;
+                        // Eigen::Matrix<float, 3, 3> rotation_UKF = lidarodom.Quaternion2Rotation(quat_UKF);
+                        // initial_guess_transMatrix.block(0, 0, 3, 3) = rotation_UKF;
                         // initial_guess_transMatrix(0, 3) = UKF_Reading_Now.X - UKF_Reading_Pre.X;
                         // initial_guess_transMatrix(1, 3) = UKF_Reading_Now.Y - UKF_Reading_Pre.Y;
                         // initial_guess_transMatrix(2, 3) = UKF_Reading_Now.Z - UKF_Reading_Pre.Z;

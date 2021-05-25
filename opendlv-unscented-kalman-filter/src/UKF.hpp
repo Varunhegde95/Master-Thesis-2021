@@ -167,7 +167,7 @@ public:
       p_p_ = Eigen::MatrixXf::Zero(10,10);
       measurements_ = Eigen::MatrixXf::Zero(8, 1);
       // UKF Initialize noise covariance
-      SetProcessNoiseCovatiance(8.8f, 0.1f, 1.0f); // Initialize Q
+      SetProcessNoiseCovatiance(8.8f, 2.0f, 1.0f); // Initialize Q
       SetMeasureNoiseCovatiance(10.0f, 1.0f, 0.05f, 0.0017f); // Initialize R
       SetInitialCovariance(); // Initialize P0
       x_f_ << odom.mx_, odom.my_, odom.mz_, sensor_reading.vf, 0.0f, 0.0f, sensor_reading.yaw, sensor_reading.wy/180*M_PI, 
