@@ -81,6 +81,8 @@ int32_t main(int32_t argc, char **argv) {
         double NDT_score;
         double ICP_score;
         double Registration_score(0.0d);
+        double registration_time(0.0d);
+        double Average_Registration_time(0.0d);
 
         UKF_Reading UKF_Reading_Pre;
         UKF_Reading UKF_Reading_Now;
@@ -141,7 +143,7 @@ int32_t main(int32_t argc, char **argv) {
 
                 /*------ 2. Crop Box Filter [Remove roof] ------*/
                 std::cout << "[Crop box filter] Original points: " << cloud_down->points.size();
-                const Eigen::Vector4f min_point(-40, -25, -1, 1);
+                const Eigen::Vector4f min_point(-40, -25, -2, 1);
                 const Eigen::Vector4f max_point(40, 25, 4, 1);
                 cloud_down = filter.boxFilter(cloud_down, min_point, max_point); //Distance Crop Box
 
@@ -196,7 +198,7 @@ int32_t main(int32_t argc, char **argv) {
                         UKF_Reading_Now.yaw   = yaw;
                         Eigen::Matrix<float, 4, 1> quat_UKF = lidarodom.Euler2Quaternion(UKF_Reading_Now.roll - UKF_Reading_Pre.roll, 
                                 UKF_Reading_Now.pitch - UKF_Reading_Pre.roll, UKF_Reading_Now.yaw - UKF_Reading_Pre.yaw);
-                        // Eigen::Matrix<float, 3, 3> rotation_UKF = lidarodom.Quaternion2Rotation(quat_UKF);
+                        Eigen::Matrix<float, 3, 3> rotation_UKF = lidarodom.Quaternion2Rotation(quat_UKF);
                         // initial_guess_transMatrix.block(0, 0, 3, 3) = rotation_UKF;
                         // initial_guess_transMatrix(0, 3) = UKF_Reading_Now.X - UKF_Reading_Pre.X;
                         // initial_guess_transMatrix(1, 3) = UKF_Reading_Now.Y - UKF_Reading_Pre.Y;
@@ -235,7 +237,8 @@ int32_t main(int32_t argc, char **argv) {
                                     << ',' << std::to_string(lidarodom.Lidar_trans(1,0)) << std::endl;
                         Registration_score += ICP_score;
 
-                        auto registration_time = timerCalculator(timer_registration, "Registration"); // Print time
+                        registration_time = timerCalculator(timer_registration, "Registration"); // Print time
+                        Average_Registration_time += registration_time;
                         if(registration_time > 0.4)
                             overtime_count ++;
                     }
@@ -254,7 +257,6 @@ int32_t main(int32_t argc, char **argv) {
                 if(VERBOSE){
                     std::cout << "Frame (" << NUM << "), ";
                     timerCalculator(frame_timer, "Every Frame");
-                    std::cout << "Registration over-time happens: " << overtime_count << std::endl;
                 }
                 if(DISPLAY){
                     viewer.removeAllPointClouds();
@@ -265,7 +267,10 @@ int32_t main(int32_t argc, char **argv) {
                 if(flag == 1){
                     std::cout << "\n--------------------------------------------------" << std::endl;
                     Registration_score = Registration_score / NUM;
+                    Average_Registration_time = Average_Registration_time / NUM;
                     std::cout << "Average registration score is: " << Registration_score << std::endl;
+                    std::cout << "Average registration time is: " << Average_Registration_time << std::endl;
+                    std::cout << "Registration over-time happens: " << overtime_count << std::endl;
                     std::string filename("/opt/saving/Registration.pcd");
                     std::cout << "Dataset Finish, Save the registrated point cloud to [" << filename << "]" << std::endl;
                     pcl::PCDWriter writer;

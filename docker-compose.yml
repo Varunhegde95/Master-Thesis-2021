@@ -10,7 +10,7 @@ services:
         network_mode: "host"
         ipc: "host"
         volumes:
-        - ${HOME}/Learning_PCL/Test_data/2011_09_26/2011_09_26_drive_0096_sync:/opt/recordings
+        - ${HOME}/Learning_PCL/Test_data/2011_09_26/2011_09_26_drive_0117_sync:/opt/recordings
         - /tmp:/tmp
         network_mode: "host"
         command: "--cid=111 --freq=10 --name=123.pcd /opt/recordings/ --verbose --id-sender=100"
